@@ -1,0 +1,8 @@
+*.lnk
+/obj
+*.log
+*.exe
+*.bat
+/spv
+/misc
+/.emacs
