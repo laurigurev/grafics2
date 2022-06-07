@@ -3,7 +3,8 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
-void vkdoodadc(VkDoodad* doodad, VkCore* core, VkBoilerplate* bp)
+void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
+			   VkCore* core, VkBoilerplate* bp)
 {
 	UPDATE_DEBUG_FILE();
 	
@@ -54,15 +55,38 @@ void vkdoodadc(VkDoodad* doodad, VkCore* core, VkBoilerplate* bp)
 		.pSpecializationInfo = NULL
 	};
 
+	float vertices[3][2] = {
+		{  0.4f, -0.7f },
+		{  0.5f,  0.5f },
+		{ -0.5f,  0.5f }
+	};
+	vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, 6*4, vertices);
+
+	uint32_t indices[3] = { 0, 1, 2 };
+	vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 3*4, indices);
+
+	VkVertexInputBindingDescription vibd = (VkVertexInputBindingDescription) {
+		.binding = 0,
+		.stride = 2*4,
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+	};
+
+	VkVertexInputAttributeDescription viad = (VkVertexInputAttributeDescription) {
+		.binding = 0,
+		.location = 0,
+		.format = VK_FORMAT_R32G32_SFLOAT,
+		.offset = 0
+	};
+
 	VkPipelineVertexInputStateCreateInfo vertex_input_info =
 		(VkPipelineVertexInputStateCreateInfo) {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 			.pNext = NULL,
 			.flags = 0,
-			.vertexBindingDescriptionCount = 0,
-			.pVertexBindingDescriptions = NULL,
-			.vertexAttributeDescriptionCount = 0,
-			.pVertexAttributeDescriptions = NULL
+			.vertexBindingDescriptionCount = 1,
+			.pVertexBindingDescriptions = &vibd,
+			.vertexAttributeDescriptionCount = 1,
+			.pVertexAttributeDescriptions = &viad
 	};
 	
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_info =
@@ -219,9 +243,11 @@ void vkdoodadc(VkDoodad* doodad, VkCore* core, VkBoilerplate* bp)
 
 	file_free(vertex_shader);
 	file_free(fragment_shader);
+
+	logt("VkDoodad created\n");
 }
 
-void vkdoodadd(VkDoodad* doodad, VkBoilerplate* bp)
+void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 {
 	UPDATE_DEBUG_FILE();
 
@@ -232,4 +258,20 @@ void vkdoodadd(VkDoodad* doodad, VkBoilerplate* bp)
 	UPDATE_DEBUG_LINE();
 	vkDestroyPipeline(bp->dev, doodad->pipeline, NULL);
 	logt("VkPipeline destroyed\n");
+
+	vkvbufferret(&doodad->vertexbuff, bufalloc);
+	vkvbufferret(&doodad->indexbuff, bufalloc);
+
+	logt("VkDoodad destroyed\n");
+}
+
+void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf)
+{
+	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
+	vkCmdBindVertexBuffers2EXTproxy(cmdbuf, 0, 1, &doodad->vertexbuff.bufferc,
+									&doodad->vertexbuff.offset, &doodad->vertexbuff.size,
+									NULL);
+	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.bufferc, doodad->indexbuff.offset, 
+						 VK_INDEX_TYPE_UINT32);
+	vkCmdDrawIndexed(cmdbuf, 3, 1, 0, 0, 0);
 }

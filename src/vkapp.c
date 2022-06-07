@@ -7,15 +7,36 @@ void vkappc(VkApp* app, Window* window)
 {
 	vkboilerplatec(&app->boilerplate, window);
 	vkcorec(&app->core, &app->boilerplate, window);
-	vkdoodadc(&app->doodad, &app->core, &app->boilerplate);
 
+	VkPoolInfo pool_infos[2] = {
+		(VkPoolInfo) {
+			.property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			.size = GIGABYTE
+		},
+		(VkPoolInfo) {
+			.property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			.size = GIGABYTE
+		}
+	};
+	
+	VkMemoryAllocatorInfo memalloc_info = (VkMemoryAllocatorInfo) {
+		.pool_info_count = 2,
+		.pool_infos = pool_infos
+	};
+	vkmemallocc(&app->memalloc, &memalloc_info, &app->boilerplate);
+	vkbufferallocc(&app->buffalloc, &app->memalloc, &app->boilerplate);
+
+	vkdoodadc(&app->doodad, &app->buffalloc, &app->core, &app->boilerplate);
 	app->current_frame = 0;
 }
 
 void vkappd(VkApp* app)
 {
 	vkDeviceWaitIdle(app->boilerplate.dev);
-	vkdoodadd(&app->doodad, &app->boilerplate);
+	vkdoodadd(&app->doodad, &app->buffalloc, &app->boilerplate);
+	vkbufferallocd(&app->buffalloc, &app->boilerplate);
+	vkmemallocd(&app->memalloc, &app->boilerplate);
 	vkcored(&app->core, &app->boilerplate);
 	vkboilerplated(&app->boilerplate);
 }
@@ -68,8 +89,9 @@ void vkrender(VkApp* app)
 	};
 	
 	vkCmdBeginRenderPass(cmdbuf, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
-	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
+	// vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
+	// vkCmdDraw(cmdbuf, 3, 1, 0, 0);
+	vkdoodadb(doodad, cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	UPDATE_DEBUG_LINE();
 	assert(vkEndCommandBuffer(cmdbuf) == VK_SUCCESS);

@@ -14,6 +14,11 @@ void vkloadextensions(VkBoilerplate* bp)
 		(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(
 			bp->inst, "vkDestroyDebugUtilsMessengerEXT"
 	);
+
+	vkCmdBindVertexBuffers2EXTproxy =
+		(PFN_vkCmdBindVertexBuffers2EXT) vkGetInstanceProcAddr(
+			bp->inst, "vkCmdBindVertexBuffers2EXT"
+	);
 	
 	logi("vulkan extensions loaded\n");
 }
