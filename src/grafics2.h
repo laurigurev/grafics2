@@ -44,6 +44,15 @@ void file_free(void* buffer);
 
 // ---------------------------------------------------------------------------------
 /*
+  		bmploader.c
+ */
+// ---------------------------------------------------------------------------------
+
+char* bmp_load(const char* file, uint32_t* width, uint32_t* height);
+void bmp_free(char* buffer);
+
+// ---------------------------------------------------------------------------------
+/*
   		win32.c
  */
 // ---------------------------------------------------------------------------------
@@ -202,7 +211,7 @@ typedef struct
 
 void vkmemallocc(VkMemoryAllocator* memalloc, VkMemoryAllocatorInfo* info, VkBoilerplate* bp);
 void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplate* bp);
-void vkmemallocimg(VkMemoryAllocator* memalloc);		// TODO
+void vkmemallocimg(VkMemoryAllocator* memalloc, VkBoilerplate* bp, VkImage* image);
 void vkmemallocd(VkMemoryAllocator* memalloc, VkBoilerplate* bp);
 
 // ---------------------------------------------------------------------------------
@@ -253,9 +262,37 @@ void vkvbufferret(VkVirtualBuffer* vbuffer, VkBufferAllocator* bufalloc);
 
 // ---------------------------------------------------------------------------------
 /*
+  		vktexture.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct
+{
+	VkImage image;
+	VkImageView view;
+	VkSampler sampler;
+} VkTexture;
+
+void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
+				VkMemoryAllocator* memalloc, VkBufferAllocator* bufalloc);
+void vktextured(VkTexture* texture, VkBoilerplate* bp);
+void vktransitionimglayout(VkImage* image, VkBoilerplate* bp, VkCore* core,
+						  VkFormat format, VkImageLayout old_layout,
+						  VkImageLayout new_layout);
+void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
+					VkVirtualBuffer* vbuf, uint32_t width, uint32_t height);
+
+// ---------------------------------------------------------------------------------
+/*
   		vkdoodad.c
  */
 // ---------------------------------------------------------------------------------
+
+typedef struct
+{
+	float position[2];
+	float uv[2];
+} Vertex;
 
 typedef struct
 {
@@ -263,12 +300,16 @@ typedef struct
 	VkPipelineLayout pipeline_layout;
 	VkVirtualBuffer vertexbuff;
 	VkVirtualBuffer indexbuff;
+	VkTexture texture;
+
+	VkDescriptorSetLayout dlayout;
+	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];
 } VkDoodad;
 
-void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
-			   VkCore* core, VkBoilerplate* bp);
+void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, 
+			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool);
 void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp);
-void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf);
+void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame);
 
 // ---------------------------------------------------------------------------------
 /*
@@ -282,6 +323,7 @@ typedef struct
 	VkCore core;
 	VkMemoryAllocator memalloc;
 	VkBufferAllocator buffalloc;
+	VkDescriptorPool dpool;
 	VkDoodad doodad;
 	uint32_t current_frame;
 } VkApp;

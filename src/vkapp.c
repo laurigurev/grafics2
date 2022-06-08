@@ -27,13 +27,36 @@ void vkappc(VkApp* app, Window* window)
 	vkmemallocc(&app->memalloc, &memalloc_info, &app->boilerplate);
 	vkbufferallocc(&app->buffalloc, &app->memalloc, &app->boilerplate);
 
-	vkdoodadc(&app->doodad, &app->buffalloc, &app->core, &app->boilerplate);
+	VkDescriptorPoolSize dpool_size = {
+		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = 10
+	};
+
+	VkDescriptorPoolCreateInfo dpool_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.pNext = NULL,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+		.maxSets = 10,
+		.poolSizeCount = 1,
+		.pPoolSizes = &dpool_size
+	};
+
+	VkBoilerplate* bp = &app->boilerplate;
+	UPDATE_DEBUG_FILE();
+	UPDATE_DEBUG_LINE();
+	VkResult res = vkCreateDescriptorPool(bp->dev, &dpool_info, NULL, &app->dpool);
+	assert(res == VK_SUCCESS);
+	logt("VkDescriptorPool created\n");
+
+	vkdoodadc(&app->doodad, &app->buffalloc, &app->memalloc,
+			  &app->core, &app->boilerplate, &app->dpool);
 	app->current_frame = 0;
 }
 
 void vkappd(VkApp* app)
 {
 	vkDeviceWaitIdle(app->boilerplate.dev);
+	vkDestroyDescriptorPool(app->boilerplate.dev, app->dpool, NULL);
 	vkdoodadd(&app->doodad, &app->buffalloc, &app->boilerplate);
 	vkbufferallocd(&app->buffalloc, &app->boilerplate);
 	vkmemallocd(&app->memalloc, &app->boilerplate);
@@ -91,7 +114,7 @@ void vkrender(VkApp* app)
 	vkCmdBeginRenderPass(cmdbuf, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 	// vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
 	// vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	vkdoodadb(doodad, cmdbuf);
+	vkdoodadb(doodad, cmdbuf, app->current_frame);
 	vkCmdEndRenderPass(cmdbuf);
 	UPDATE_DEBUG_LINE();
 	assert(vkEndCommandBuffer(cmdbuf) == VK_SUCCESS);

@@ -51,7 +51,8 @@ void vkbufferallocc(VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc,
 		UPDATE_DEBUG_LINE();
 		VkResult res = vkCreateBuffer(bp->dev, buffer_infos + i, NULL, &page->buffer);
 		assert(res == VK_SUCCESS);
-		logt("VkBuffer created, page index : % i\n", i);
+		logt("VkBuffer created, page index : %i\n", i);
+		flushl();
 
 		VkBufferInfo info = (VkBufferInfo) {
 			.buffer = &page->buffer,
@@ -131,6 +132,7 @@ void vkvbufferalloc(VkVirtualBuffer* vbuffer, VkBufferAllocator* bufalloc,
 	}
 
 	logt("failed to allocate virtual buffer, page : %i, size : %i\n", page_index, size);
+	exit(0);
 }
 
 void vkvbufferstage(VkVirtualBuffer* dst, VkBufferAllocator* bufalloc, VkBoilerplate* bp,

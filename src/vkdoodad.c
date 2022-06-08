@@ -3,10 +3,78 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
-void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
-			   VkCore* core, VkBoilerplate* bp)
+void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, 
+			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
 {
 	UPDATE_DEBUG_FILE();
+
+	vktexturec(&doodad->texture, bp, core, memalloc, bufalloc);
+
+	VkDescriptorSetLayoutBinding dlayout_binding = {
+		.binding = 0,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = 1,
+		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.pImmutableSamplers = NULL
+	};
+
+	VkDescriptorSetLayoutCreateInfo dlayout_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext = NULL,
+		.flags = 0,
+		.bindingCount = 1,
+		.pBindings = &dlayout_binding
+	};
+
+	UPDATE_DEBUG_LINE();
+	VkResult res = vkCreateDescriptorSetLayout(bp->dev, &dlayout_info, NULL,
+												&doodad->dlayout);
+	assert(res == VK_SUCCESS);
+	logt("VkDescriptorSetLayout created\n");
+	flushl();
+
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		// TODO: find out why descriptorSetCount must be 1
+		
+		VkDescriptorSetAllocateInfo dset_alloc_info = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.pNext = NULL,
+			.descriptorPool = *dpool,
+			.descriptorSetCount = 1,
+			.pSetLayouts = &doodad->dlayout
+		};
+
+		UPDATE_DEBUG_LINE();
+		res = vkAllocateDescriptorSets(bp->dev, &dset_alloc_info, doodad->dsets + i);
+		assert(res == VK_SUCCESS);
+		logt("VkDescriptorSet allocated\n");
+		
+		VkDescriptorImageInfo dset_image_info = {
+			.sampler = doodad->texture.sampler,
+			.imageView = doodad->texture.view,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		};
+		
+		VkWriteDescriptorSet dset_write = {
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.pNext = NULL,
+			.dstSet = doodad->dsets[i],
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &dset_image_info,
+			.pBufferInfo = NULL,
+			.pTexelBufferView = NULL
+		};
+
+		UPDATE_DEBUG_LINE();
+		vkUpdateDescriptorSets(bp->dev, 1, &dset_write, 0, NULL);
+		logt("VkDescriptorSet updated\n");
+	}
+
+	// -------------------------------------------------------------------
 	
 	uint32_t vertsize, fragsize;
 	char* vertex_shader = file_read("spv/default.vert.spv", &vertsize);
@@ -24,7 +92,7 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
    	};
 
 	UPDATE_DEBUG_LINE();
-	VkResult res = vkCreateShaderModule(
+	res = vkCreateShaderModule(
 		bp->dev, &shader_module_info, NULL, shader_modules + 0);
 	assert(res == VK_SUCCESS);
 		
@@ -55,27 +123,36 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
 		.pSpecializationInfo = NULL
 	};
 
-	float vertices[3][2] = {
-		{  0.4f, -0.7f },
-		{  0.5f,  0.5f },
-		{ -0.5f,  0.5f }
+	Vertex vertices[4] = {
+		{ { -0.5f, -0.5f }, { 1.0f, 0.0f } },
+		{ {  0.5f, -0.5f }, { 0.0f, 0.0f } },
+		{ {  0.5f,  0.5f }, { 0.0f, 1.0f } },
+		{ { -0.5f,  0.5f }, { 1.0f, 1.0f } }
 	};
-	vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, 6*4, vertices);
+	vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, sizeof(Vertex) * 4, vertices);
 
-	uint32_t indices[3] = { 0, 1, 2 };
-	vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 3*4, indices);
+	uint32_t indices[6] = { 0, 1, 3, 1, 2, 3 };
+	vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 6*4, indices);
 
 	VkVertexInputBindingDescription vibd = (VkVertexInputBindingDescription) {
 		.binding = 0,
-		.stride = 2*4,
+		.stride = sizeof(Vertex),
 		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
 	};
 
-	VkVertexInputAttributeDescription viad = (VkVertexInputAttributeDescription) {
-		.binding = 0,
-		.location = 0,
-		.format = VK_FORMAT_R32G32_SFLOAT,
-		.offset = 0
+	VkVertexInputAttributeDescription viad[2] = {
+		(VkVertexInputAttributeDescription) {
+			.binding = 0,
+			.location = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = 0
+		},
+		(VkVertexInputAttributeDescription) {
+			.binding = 0,
+			.location = 1,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = 2*4
+		}
 	};
 
 	VkPipelineVertexInputStateCreateInfo vertex_input_info =
@@ -85,8 +162,8 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
 			.flags = 0,
 			.vertexBindingDescriptionCount = 1,
 			.pVertexBindingDescriptions = &vibd,
-			.vertexAttributeDescriptionCount = 1,
-			.pVertexAttributeDescriptions = &viad
+			.vertexAttributeDescriptionCount = 2,
+			.pVertexAttributeDescriptions = viad
 	};
 	
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_info =
@@ -200,8 +277,8 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc,
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.pNext = NULL,
 		.flags = 0,
-		.setLayoutCount = 0,
-		.pSetLayouts = NULL,
+		.setLayoutCount = 1,
+		.pSetLayouts = &doodad->dlayout,
 		.pushConstantRangeCount = 0,
 		.pPushConstantRanges = NULL
 	};
@@ -252,6 +329,10 @@ void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 	UPDATE_DEBUG_FILE();
 
 	UPDATE_DEBUG_LINE();
+	vkDestroyDescriptorSetLayout(bp->dev, doodad->dlayout, NULL);
+	logt("VkDescriptorSetLayout created\n");
+
+	UPDATE_DEBUG_LINE();
 	vkDestroyPipelineLayout(bp->dev, doodad->pipeline_layout, NULL);
 	logt("VkPipelineLayout destroyed\n");
 
@@ -262,10 +343,12 @@ void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 	vkvbufferret(&doodad->vertexbuff, bufalloc);
 	vkvbufferret(&doodad->indexbuff, bufalloc);
 
+	vktextured(&doodad->texture, bp);
+
 	logt("VkDoodad destroyed\n");
 }
 
-void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf)
+void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame)
 {
 	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
 	vkCmdBindVertexBuffers2EXTproxy(cmdbuf, 0, 1, &doodad->vertexbuff.bufferc,
@@ -273,5 +356,8 @@ void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf)
 									NULL);
 	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.bufferc, doodad->indexbuff.offset, 
 						 VK_INDEX_TYPE_UINT32);
-	vkCmdDrawIndexed(cmdbuf, 3, 1, 0, 0, 0);
+	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							doodad->pipeline_layout, 0, 1,
+							&doodad->dsets[current_frame], 0, NULL);
+	vkCmdDrawIndexed(cmdbuf, 6, 1, 0, 0, 0);
 }

@@ -100,6 +100,7 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 							     bp->dev, *info->buffer, pool->devmem, alloc->offset);
 				assert(res == VK_SUCCESS);
 				logt("buffer binded succesfully\n");
+				flushl();
 				
 				binded = true;
 
@@ -124,6 +125,51 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 		if (binded)
 	    {
 			break;
+		}
+	}
+}
+
+void vkmemallocimg(VkMemoryAllocator* memalloc, VkBoilerplate* bp, VkImage* image)
+{
+	UPDATE_DEBUG_FILE();
+	
+	VkMemoryRequirements mem_requirements;
+	vkGetImageMemoryRequirements(bp->dev, *image, &mem_requirements);
+
+	VkPhysicalDeviceMemoryProperties phydev_mem_properties;
+	vkGetPhysicalDeviceMemoryProperties(bp->phydev, &phydev_mem_properties);
+
+	uint32_t heap_index;
+	for (uint32_t i = 0; i < phydev_mem_properties.memoryTypeCount; i++)
+	{
+		if (mem_requirements.memoryTypeBits & (1 << i) &&
+			phydev_mem_properties.memoryTypes[i].propertyFlags &
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+		{
+			heap_index = phydev_mem_properties.memoryTypes[i].heapIndex;
+			break;
+		}
+	}
+
+	VkHeap* heap = memalloc->heaps + heap_index;
+	for (uint32_t i = 0; i < heap->pool_count; i++)
+	{
+		VkMemoryPool* pool = heap->pools + i;
+		for (uint32_t j = 0; j < pool->alloc_count; j++)
+		{
+			VkAllocation* alloc = pool->allocs + j;
+			if (mem_requirements.size < alloc->size)
+			{
+				UPDATE_DEBUG_LINE();
+				VkResult res = vkBindImageMemory(bp->dev, *image, pool->devmem, 0);
+				assert(res == VK_SUCCESS);
+				logt("image binded succesfully\n");
+
+				alloc->offset += mem_requirements.size;
+				alloc->size -= mem_requirements.size;
+
+				break;
+			}
 		}
 	}
 }
