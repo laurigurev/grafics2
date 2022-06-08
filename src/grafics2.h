@@ -5,14 +5,15 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <time.h>
 #include <assert.h>
 #include <vulkan.h>
 #include <windows.h>
 
 #define KILOBYTE 1024
-#define MEGABYTE KILOBYTE*1024
-#define GIGABYTE MEGABYTE*1024
+#define MEGABYTE 1024*1024
+#define GIGABYTE 1024*1024*1024
 
 // ---------------------------------------------------------------------------------
 /*

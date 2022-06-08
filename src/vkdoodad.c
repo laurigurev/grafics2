@@ -320,8 +320,6 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator*
 
 	file_free(vertex_shader);
 	file_free(fragment_shader);
-
-	logt("VkDoodad created\n");
 }
 
 void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)

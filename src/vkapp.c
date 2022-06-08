@@ -62,6 +62,7 @@ void vkappd(VkApp* app)
 	vkmemallocd(&app->memalloc, &app->boilerplate);
 	vkcored(&app->core, &app->boilerplate);
 	vkboilerplated(&app->boilerplate);
+	flushl();
 }
 
 void vkrender(VkApp* app)

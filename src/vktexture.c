@@ -10,7 +10,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 
 	uint32_t width, height;
 	void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
-	
+
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.pNext = NULL,
@@ -22,8 +22,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.arrayLayers = 1,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
-		.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-				 VK_IMAGE_USAGE_SAMPLED_BIT,
+		.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
 		.pQueueFamilyIndices = NULL,
@@ -86,7 +85,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.compareEnable = VK_FALSE,
 		.compareOp = VK_COMPARE_OP_ALWAYS,
 		.minLod = 0.0f,
-		.maxLod = 1.0f,
+		.maxLod = 0.0f,
 		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
 		.unnormalizedCoordinates = VK_FALSE
 	};
@@ -183,6 +182,8 @@ void vktransitionimglayout(VkImage* image, VkBoilerplate* bp, VkCore* core,
 	vkCmdPipelineBarrier(cmdbuf, src_stage, dst_stage, 0, 0, NULL, 0, NULL,	1, &barrier);
 
 	vkEndCommandBuffer(cmdbuf);
+
+	flushl();
 	
 	VkSubmitInfo submit_info = (VkSubmitInfo) {
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,

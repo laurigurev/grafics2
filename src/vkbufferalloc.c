@@ -16,7 +16,7 @@ void vkbufferallocc(VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc,
 			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 			.pNext = NULL,
 			.flags = 0,
-			.size = MEGABYTE,
+			.size = MEGABYTE * 2,
 			.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
 					 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
 					 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -28,7 +28,7 @@ void vkbufferallocc(VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc,
 			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 			.pNext = NULL,
 			.flags = 0,
-			.size = MEGABYTE,
+			.size = MEGABYTE * 2,
 			.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 					 VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
 					 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -42,6 +42,8 @@ void vkbufferallocc(VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 	};
+
+	bool should_map[2] = { true, false };
 
 	for (uint32_t i = 0; i < bufalloc->page_count; i++)
 	{
@@ -58,7 +60,7 @@ void vkbufferallocc(VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc,
 			.buffer = &page->buffer,
 			.size = buffer_infos[i].size,
 			.property_flags = property_flags[i],
-			.should_map = true,
+			.should_map = should_map[i],
 			.mapped = NULL,
 			.devmem = NULL
 		};

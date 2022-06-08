@@ -141,6 +141,16 @@ void vkcorec(VkCore* core, VkBoilerplate* bp, Window* win)
    		.pPreserveAttachments = NULL
 	};
 
+	VkSubpassDependency dependency = {
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0,
+		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = 0,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.dependencyFlags = 0
+	};
+
 	VkRenderPassCreateInfo renderpass_info = (VkRenderPassCreateInfo) {
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.pNext = NULL,
@@ -149,8 +159,8 @@ void vkcorec(VkCore* core, VkBoilerplate* bp, Window* win)
 		.pAttachments = &attachment,
 		.subpassCount = 1,
 		.pSubpasses = &subpass,
-		.dependencyCount = 0,
-		.pDependencies = NULL
+		.dependencyCount = 1,
+		.pDependencies = &dependency
 	};
 
 	UPDATE_DEBUG_LINE();

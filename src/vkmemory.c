@@ -82,7 +82,6 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 		}
 	}
 
-	bool binded = false;
 	VkHeap* heap = memalloc->heaps + heap_index;
 	for (uint32_t i = 0; i < heap->pool_count; i++)
 	{
@@ -90,7 +89,7 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 		for (uint32_t j = 0; j < pool->alloc_count; j++)
 		{
 			VkAllocation* alloc = pool->allocs + j;
-			if (info->size < alloc->size)
+			if (info->size <= alloc->size)
 			{
 				// alignment stuff
 				// what if new pools are needed?
@@ -102,8 +101,6 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 				logt("buffer binded succesfully\n");
 				flushl();
 				
-				binded = true;
-
 				alloc->offset += info->size;
 				alloc->size -= info->size;
 
@@ -118,13 +115,8 @@ void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplat
 			    }
 				// NOTE:  pool can be reallocated
 				info->devmem = &pool->devmem;
-				break;
+				return;
 			}
-		}
-
-		if (binded)
-	    {
-			break;
 		}
 	}
 }
@@ -158,20 +150,24 @@ void vkmemallocimg(VkMemoryAllocator* memalloc, VkBoilerplate* bp, VkImage* imag
 		for (uint32_t j = 0; j < pool->alloc_count; j++)
 		{
 			VkAllocation* alloc = pool->allocs + j;
-			if (mem_requirements.size < alloc->size)
+			if (mem_requirements.size <= alloc->size)
 			{
 				UPDATE_DEBUG_LINE();
-				VkResult res = vkBindImageMemory(bp->dev, *image, pool->devmem, 0);
+				VkResult res = vkBindImageMemory(bp->dev, *image, pool->devmem, alloc->offset);
 				assert(res == VK_SUCCESS);
 				logt("image binded succesfully\n");
 
 				alloc->offset += mem_requirements.size;
 				alloc->size -= mem_requirements.size;
 
-				break;
+				return;
 			}
 		}
 	}
+	
+	loge("failed to bind image to memory\n");
+	flushl();
+	exit(0);
 }
 
 void vkmemallocd(VkMemoryAllocator* memalloc, VkBoilerplate* bp)
