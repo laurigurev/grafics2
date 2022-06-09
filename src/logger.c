@@ -48,6 +48,7 @@ void flushl()
 
 void log_close()
 {
+	// causes SIGTRAP in gdb
 	if (!LOGGER.is_closed)
 	{
 		fclose(LOGGER.f);

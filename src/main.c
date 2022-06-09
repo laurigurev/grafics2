@@ -3,9 +3,11 @@
 int main()
 {
 	log_init("grafics2.log");
-	logi("hello, vulkan!\n");
+	// logi("hello, vulkan!\n");
+
+	ttf_load();
 	
-	Window win;
+	/* Window win;
 	windowc(&win, "grafics2.exe", 750, 500);
 
 	VkApp app;
@@ -18,7 +20,7 @@ int main()
 	}
 
 	vkappd(&app);
-	windowd(&win);
+	windowd(&win);*/
 	
 	log_close();
 	
