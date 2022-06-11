@@ -17,6 +17,26 @@
 
 // ---------------------------------------------------------------------------------
 /*
+  		vector.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct
+{
+	uint64_t stride;
+	uint32_t alloc_size;
+	uint32_t size;
+	void* data;
+} vector;
+
+void vector_add(); 		// TODO
+void vector_push();		// TODO
+void vector_rem();		// TODO
+void vector_pop();		// TODO
+
+
+// ---------------------------------------------------------------------------------
+/*
   		logger.c
  */
 // ---------------------------------------------------------------------------------
@@ -177,18 +197,29 @@ typedef struct
 
 typedef struct
 {
-	ttf_cmap_index* index;
+	ttf_cmap_index index;
 	ttf_cmap_estable* tables;
-	ttf_cmap_format4* format;
+	ttf_cmap_format4 format;
 } ttf_cmap;
 
 typedef struct
 {
-	ttf_head head;
-	ttf_hhea hhea;
-	ttf_maxp maxp;
-	ttf_hmtx hmtx;
-	ttf_cmap cmap;
+	int16_t num_of_contours;
+	int16_t	x_min;
+	int16_t	y_min;
+	int16_t	x_max;
+	int16_t	y_max;
+} ttf_glyf;
+
+typedef struct
+{	
+	ttf_head* head;
+	ttf_hhea* hhea;
+	ttf_maxp* maxp;
+	ttf_hmtx* hmtx;
+	ttf_cmap* cmap;
+	uint32_t* loca;
+	ttf_glyf* glyf;
 } ttf_core;
 
 // cmap, glyf, head, hhea, hmtx, loca, maxp are MANDATORY
@@ -196,13 +227,19 @@ typedef struct
 
 void ttf_load();
 
-void ttf_head_load(ttf_core* ttf);
-void ttf_hhea_load(ttf_core* ttf);
-void ttf_maxp_load(ttf_core* ttf);
-void ttf_hmtx_load(ttf_core* ttf);
-void ttf_cmap_load(ttf_core* ttf);
+void ttf_head_load(ttf_core* ttf, void* file);
+void ttf_hhea_load(ttf_core* ttf, void* file);
+void ttf_maxp_load(ttf_core* ttf, void* file);
+void ttf_hmtx_load(ttf_core* ttf, void* file);
+void ttf_cmap_load(ttf_core* ttf, void* file);
+void ttf_loca_load(ttf_core* ttf, void* file);
+void ttf_glyf_load(ttf_core* ttf, void* file); // TODO
 
-void ttf_cmap_format4_table_load(ttf_cmap* cmap, uint32_t offset);
+void ttf_cmap_format4_table_load(ttf_cmap* cmap, void* file);
+
+void ttf_hmtx_free(ttf_core* ttf);
+void ttf_cmap_free(ttf_core* ttf);
+void ttf_loca_free(ttf_core* ttf);
 
 // ---------------------------------------------------------------------------------
 /*
