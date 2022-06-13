@@ -17,23 +17,29 @@
 
 // ---------------------------------------------------------------------------------
 /*
-  		vector.c
+  		array.c
  */
 // ---------------------------------------------------------------------------------
 
 typedef struct
 {
-	uint64_t stride;
-	uint32_t alloc_size;
-	uint32_t size;
-	void* data;
-} vector;
+	uint32_t		stride;
+	uint32_t 		alloc_size;
+	uint32_t 		size;
+	void* 			data;
+} array;
 
-void vector_add(); 		// TODO
-void vector_push();		// TODO
-void vector_rem();		// TODO
-void vector_pop();		// TODO
-
+void arr_init(array* arr, uint64_t stride);
+void arr_add(array* arr, void* src);
+void arr_ins();									// TODO
+void arr_push();								// TODO
+void arr_rem();									// TODO
+void arr_pop(array* arr);
+void arr_clean(array* arr);
+void arr_free(array* arr);
+uint64_t arr_sizeof(array* arr);
+void arr_copy(array* arr, uint32_t count, void* src); // TODO
+void* arr_get(array* arr, uint32_t index);
 
 // ---------------------------------------------------------------------------------
 /*
@@ -209,6 +215,24 @@ typedef struct
 	int16_t	y_min;
 	int16_t	x_max;
 	int16_t	y_max;
+} ttf_glyf_header;
+
+typedef struct
+{
+	// uint16_t num_contours;
+	uint16_t* end_contours;
+	uint16_t instruction_len;
+	uint8_t* instructions;
+	uint16_t num_points;
+	uint8_t* flags;
+	int16_t* px;
+	int16_t* py;
+} ttf_glyf_data;
+
+typedef struct
+{
+	ttf_glyf_header header;
+	ttf_glyf_data data;
 } ttf_glyf;
 
 typedef struct
@@ -235,11 +259,14 @@ void ttf_cmap_load(ttf_core* ttf, void* file);
 void ttf_loca_load(ttf_core* ttf, void* file);
 void ttf_glyf_load(ttf_core* ttf, void* file); // TODO
 
+void ttf_glyf_data_load(ttf_core* ttf, ttf_glyf* glyf, void* file, uint32_t offset);
 void ttf_cmap_format4_table_load(ttf_cmap* cmap, void* file);
 
 void ttf_hmtx_free(ttf_core* ttf);
 void ttf_cmap_free(ttf_core* ttf);
 void ttf_loca_free(ttf_core* ttf);
+void ttf_glyf_data_free(ttf_glyf* glyf);
+void ttf_glyf_free(ttf_core* ttf);
 
 // ---------------------------------------------------------------------------------
 /*

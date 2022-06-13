@@ -108,13 +108,14 @@ void ttf_load()
 	if (headers[6].tag) { ttf_glyf_load(&ttf, file + headers[6].offset); }
 	else { ttf_loge("[ttf_core] 'glyf' table not found\n"); exit(0); }
 
-	free(ttf.head);
-	free(ttf.hhea);
-	free(ttf.maxp);
-	ttf_hmtx_free(&ttf);
-	ttf_cmap_free(&ttf);
+	ttf_glyf_free(&ttf);
 	ttf_loca_free(&ttf);
-
+	ttf_cmap_free(&ttf);
+	ttf_hmtx_free(&ttf);
+	free(ttf.maxp);
+	free(ttf.hhea);
+	free(ttf.head);
+	
 	free(headers);
 	free(td);
 	file_free(file);
@@ -310,16 +311,301 @@ void ttf_glyf_load(ttf_core* ttf, void* file)
 {
 	// TODO: deal with errors
 	
-	ttf->glyf = (ttf_glyf*) malloc(sizeof(ttf_glyf));
-	ttf_glyf* glyf = ttf->glyf;
-	memcpy(glyf, file, sizeof(ttf_glyf));
-	glyf->num_of_contours = ENDIAN_WORD(glyf->num_of_contours);
-	glyf->x_min = ENDIAN_WORD(glyf->x_min);
-	glyf->y_min = ENDIAN_WORD(glyf->y_min);
-	glyf->x_max = ENDIAN_WORD(glyf->x_max);
-	glyf->y_max = ENDIAN_WORD(glyf->y_max);
+	uint16_t num_glyphs = ttf->maxp->num_glyphs;
+	ttf->glyf = (ttf_glyf*) calloc(num_glyphs, sizeof(ttf_glyf));
 
-	// ttf_logi("[ttf_core] 'loca' table loaded\n");
+	for (uint16_t i = 0; i < num_glyphs - 1; i++) {
+		uint32_t offset = ttf->loca[i];
+		uint32_t next_offset = ttf->loca[i + 1];
+
+		if (offset - next_offset == 0) {
+			continue;
+		}
+		
+		ttf_glyf_data_load(ttf, ttf->glyf + i, file, offset);
+	}
+
+	// load last glyph
+	ttf_glyf_data_load(ttf, ttf->glyf + num_glyphs - 1, file, ttf->loca[num_glyphs - 1]);
+	
+	ttf_logi("[ttf_core] 'glyf' table loaded\n");
+}
+
+// NOT IN HEADER
+float f2fot14_to_float(uint16_t f2dot14) {
+	// TODO: deal with integer conversions
+	
+	int8_t tmp1 = (0xc000 & f2dot14) >> 14;
+	if (tmp1 == 2) {
+		tmp1 = -2;
+	}
+	else if (tmp1 == 3) {
+		tmp1 = -1;
+	}
+	
+	float scale = (float) tmp1;
+	f2dot14 &= 0x3fff;
+	scale += (float) (f2dot14 / 0x4000);
+	return scale;
+}
+
+void ttf_glyf_data_load(ttf_core* ttf, ttf_glyf* glyf, void* file, uint32_t offset)
+{
+	ttf_glyf_header* header = &glyf->header;
+	memcpy(header, file + offset, sizeof(ttf_glyf_header));
+
+	header->num_of_contours = ENDIAN_WORD(header->num_of_contours);
+	header->x_min = ENDIAN_WORD(header->x_min);
+	header->y_min = ENDIAN_WORD(header->y_min);
+	header->x_max = ENDIAN_WORD(header->x_max);
+	header->y_max = ENDIAN_WORD(header->y_max);
+
+	offset += sizeof(ttf_glyf_header);
+
+	if (header->num_of_contours >= 0) {
+		// simple glyf description
+		ttf_glyf_data* simple = &glyf->data;
+		uint16_t ec_size = sizeof(uint16_t) * header->num_of_contours;
+		simple->end_contours = (uint16_t*) malloc(ec_size);
+		memcpy(simple->end_contours, file + offset, ec_size);
+		for (uint16_t i = 0; i < header->num_of_contours; i++) {
+			simple->end_contours[i] = ENDIAN_WORD(simple->end_contours[i]);
+		}
+
+		offset += ec_size;
+
+	    memcpy(&simple->instruction_len, file + offset, sizeof(uint16_t));
+		simple->instruction_len = ENDIAN_WORD(simple->instruction_len);
+
+		offset += sizeof(uint16_t);
+		simple->instructions = (uint8_t*) malloc(simple->instruction_len);
+		memcpy(simple->instructions, file + offset, simple->instruction_len);
+
+		offset += simple->instruction_len;
+
+		simple->num_points = simple->end_contours[header->num_of_contours - 1];
+		simple->num_points++;
+		// simple->num_points = ENDIAN_WORD(num_points);
+
+		simple->flags = (uint8_t*) malloc(simple->num_points);
+		memcpy(simple->flags, file + offset, simple->num_points);
+
+		offset += simple->num_points;
+ 
+		simple->px = (int16_t*) malloc(sizeof(int16_t) * simple->num_points);
+		simple->py = (int16_t*) malloc(sizeof(int16_t) * simple->num_points);
+
+		// TODO: check if coordinates that are 2 bytes long, are converted
+		// 		 correctly into a bigger form?
+
+		void* x = file + offset;
+		int16_t pos = 0;		// coordinates are relative
+		
+		for (uint16_t i = 0; i < simple->num_points; i++) {
+			if (simple->flags[i] & 0x10) {
+				if (simple->flags[i] & 0x02) {
+					pos +=  *((int16_t*) x);
+					x++;
+					simple->px[i] = pos;
+				}
+				else {
+					simple->px[i] = pos;
+				}
+			}
+			else {
+				if (simple->flags[i] & 0x02) {
+					pos -=  *((int16_t*) x);
+					x++;
+					simple->px[i] = pos;
+				}
+				else {
+					int16_t temp = *((int16_t*) x);
+					temp = ENDIAN_WORD(temp);
+					pos += temp;
+					x += 2;
+					simple->px[i] = pos;
+				}
+			}
+		}
+
+		pos = 0;		// coordinates are relative
+		for (uint16_t i = 0; i < simple->num_points; i++) {
+			if (simple->flags[i] & 0x20) {
+				if (simple->flags[i] & 0x04) {
+					pos +=  *((int16_t*) x);
+					x++;
+					simple->py[i] = pos;
+				}
+				else {
+					simple->py[i] = pos;
+				}
+			}
+			else {
+				if (simple->flags[i] & 0x04) {
+					pos -= *((int16_t*) x);
+					x++;
+					simple->py[i] = pos;
+				}
+				else {
+					int16_t temp = *((int16_t*) x);
+					temp = ENDIAN_WORD(temp);
+					pos += temp;
+					x += 2;
+					simple->py[i] = pos;
+				}
+			}
+		}
+	}
+	else {
+		// compound glyf description
+		uint16_t flags;
+		uint16_t num_contours = 0;
+		uint16_t num_points = 0;
+		uint16_t num_instructions = 0;
+		array components;
+		
+		arr_init(&components, sizeof(ttf_glyf));
+
+		do {
+			flags = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+			offset += sizeof(uint16_t);
+		
+			uint16_t glyph_index = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+			offset += sizeof(uint16_t);
+		
+			// get child glyph using loca
+			ttf_glyf component;
+			ttf_glyf_data_load(ttf, &component, file, ttf->loca[glyph_index]);
+	
+			// add to array
+			arr_add(&components, &component);
+			
+			uint16_t x, y;
+		
+			if (flags & 0x0001) {
+				x = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				y = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+			}
+			else {
+				uint8_t tmp = *((uint8_t*) (file + offset));
+				offset++;
+				x = (uint16_t) tmp;
+				tmp = *((uint8_t*) (file + offset));
+				offset++;
+				y = (uint16_t) tmp;
+			}
+			// don't know why this
+			if (flags & 0x0002) {
+				for (uint16_t i = 0; i < component.data.num_points; i++) {
+					component.data.px[i] += x;
+					component.data.py[i] += y;
+				}
+			}
+
+			if (flags & 0x0008) {
+				uint16_t f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				// deal with f2dot14
+				float scale = f2fot14_to_float(f2dot14);
+				for (uint16_t i = 0; i < component.data.num_points; i++) {
+					component.data.px[i] = (int16_t) component.data.px[i] * scale;
+					component.data.px[i] = (int16_t) component.data.py[i] * scale;
+				}
+			}
+			else if (flags & 0x0040) {
+				uint16_t f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float x_scale = f2fot14_to_float(f2dot14);
+			
+				f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float y_scale = f2fot14_to_float(f2dot14);
+
+				for (uint16_t i = 0; i < component.data.num_points; i++) {
+					component.data.px[i] = (int16_t) component.data.px[i] * x_scale;
+					component.data.px[i] = (int16_t) component.data.py[i] * y_scale;
+				}
+			}
+			else if (flags & 0x0080) {
+				uint16_t f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float transform_11 = f2fot14_to_float(f2dot14);
+
+				f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float transform_12 = f2fot14_to_float(f2dot14);
+
+				f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float transform_21 = f2fot14_to_float(f2dot14);
+
+				f2dot14 = ENDIAN_WORD(*((uint16_t*) (file + offset)));
+				offset += sizeof(uint16_t);
+				float transform_22 = f2fot14_to_float(f2dot14);
+
+				for (uint16_t i = 0; i < component.data.num_points; i++) {
+					component.data.px[i] = (int16_t) component.data.px[i] * transform_11 +
+						component.data.py[i] * transform_21;
+					component.data.px[i] = (int16_t) component.data.py[i] * transform_12 +
+						component.data.px[i] * transform_22;
+				}
+			}
+
+			num_contours += component.header.num_of_contours;
+			num_points += component.data.num_points;
+			num_instructions += component.data.instruction_len;
+			
+		} while (flags & 0x0020);
+
+		// copy all components to glyph data
+		ttf_glyf_data* compound = &glyf->data;
+
+		header->num_of_contours = num_contours;
+		compound->end_contours = (uint16_t*) malloc(sizeof(uint16_t) * num_contours);
+		compound->instruction_len = num_instructions;
+		compound->instructions = (uint8_t*) malloc(num_instructions);
+		compound->num_points = num_points;
+		compound->flags = (uint8_t*) malloc(num_points);
+		compound->px = (int16_t*) malloc(sizeof(int16_t) * num_points);
+		compound->py = (int16_t*) malloc(sizeof(int16_t) * num_points);
+
+		ttf_glyf* tmp = (ttf_glyf*) arr_get(&components, 0);
+		uint16_t* contours_ptr = compound->end_contours;
+		uint8_t* instructions_ptr = compound->instructions;
+		uint8_t* flags_ptr = compound->flags;
+		int16_t* px_ptr = compound->px;
+		int16_t* py_ptr = compound->py;
+		
+		for (uint32_t i = 0; i < components.size; i++) {
+			memcpy(contours_ptr, tmp->data.end_contours,
+				   sizeof(uint16_t) * tmp->header.num_of_contours);
+			contours_ptr += tmp->header.num_of_contours;
+
+			memcpy(instructions_ptr, tmp->data.instructions, tmp->data.instruction_len);
+			instructions_ptr += tmp->data.instruction_len;
+
+			memcpy(flags_ptr, tmp->data.flags, tmp->data.num_points);
+			flags_ptr += tmp->data.num_points;
+
+			memcpy(px_ptr, tmp->data.px, sizeof(int16_t) * tmp->data.num_points);
+			px_ptr += tmp->data.num_points;
+
+			memcpy(py_ptr, tmp->data.py, sizeof(int16_t) * tmp->data.num_points);
+			py_ptr += tmp->data.num_points;
+			
+			tmp++;
+		}
+
+		tmp = (ttf_glyf*) arr_get(&components, 0);
+		for (uint32_t i = 0; i < components.size; i++) {
+			ttf_glyf_data_free(tmp);
+			tmp++;
+		}
+
+		arr_free(&components);
+	}
 }
 
 void ttf_cmap_format4_table_load(ttf_cmap* cmap, void* file)
@@ -397,4 +683,24 @@ void ttf_cmap_free(ttf_core* ttf)
 void ttf_loca_free(ttf_core* ttf)
 {
 	free(ttf->loca);
+}
+
+void ttf_glyf_data_free(ttf_glyf* glyf)
+{
+	ttf_glyf_data* data = &glyf->data;
+
+	free(data->end_contours);
+	free(data->instructions);
+	free(data->flags);
+	free(data->px);
+	free(data->py);
+}
+
+void ttf_glyf_free(ttf_core* ttf)
+{
+	for (uint16_t i = 0; i < ttf->maxp->num_glyphs; i++) {
+		ttf_glyf_data_free(ttf->glyf + i);
+	}
+	
+	free(ttf->glyf);
 }
