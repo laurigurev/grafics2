@@ -2,7 +2,7 @@
 
 #define ARRAY_ALLOC_SIZE 16
 
-void arr_init(array* arr, uint64_t stride)
+void arr_init(Array* arr, uint64_t stride)
 {
 	arr->stride = stride;
 	arr->alloc_size = ARRAY_ALLOC_SIZE;
@@ -10,7 +10,7 @@ void arr_init(array* arr, uint64_t stride)
 	arr->data = calloc(arr->alloc_size, arr->stride);
 }
 
-void arr_add(array* arr, void* src)
+void arr_add(Array* arr, void* src)
 {
 	memcpy(arr->data + (arr->stride * arr->size), src, arr->stride);
 	arr->size++;
@@ -20,7 +20,7 @@ void arr_add(array* arr, void* src)
 	}
 }
 
-void arr_pop(array* arr)
+void arr_pop(Array* arr)
 {
 	if (arr->size != 0) {
 		// this is memory safe, might be unnecessary
@@ -29,7 +29,7 @@ void arr_pop(array* arr)
 	}
 }
 
-void arr_clean(array* arr)
+void arr_clean(Array* arr)
 {
 	if (arr->size != 0) {
 		// this is memory safe, might be unnecessary
@@ -38,23 +38,23 @@ void arr_clean(array* arr)
 	}
 }
 
-void arr_free(array* arr)
+void arr_free(Array* arr)
 {
 	arr->stride = 0;
 	arr->alloc_size = 0;
 	arr->size = 0;
-	free(arr->data);
+	if (arr->data) {
+		free(arr->data);
+	}
 }
 
-uint64_t arr_sizeof(array* arr)
+uint64_t arr_sizeof(Array* arr)
 {
 	return (uint64_t) arr->stride * (uint64_t) arr->size;
 }
 
-void* arr_get(array* arr, uint32_t index)
+void* arr_get(Array* arr, uint32_t index)
 {
-	if (index < arr->size) {
-		return arr->data + (arr->stride * index);
-	}
-	return NULL;
+	index = index % arr->size;
+	return arr->data + (arr->stride * index);
 }

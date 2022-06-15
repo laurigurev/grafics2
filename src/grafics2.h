@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <assert.h>
+#include <math.h>
 #include <vulkan.h>
 #include <windows.h>
 
@@ -27,19 +28,21 @@ typedef struct
 	uint32_t 		alloc_size;
 	uint32_t 		size;
 	void* 			data;
-} array;
+} Array;
 
-void arr_init(array* arr, uint64_t stride);
-void arr_add(array* arr, void* src);
-void arr_ins();									// TODO
+void arr_init(Array* arr, uint64_t stride);
+void arr_add(Array* arr, void* src);
+void arr_insert();								// TODO
+void arr_insertm();								// TODO: insert multiple
 void arr_push();								// TODO
 void arr_rem();									// TODO
-void arr_pop(array* arr);
-void arr_clean(array* arr);
-void arr_free(array* arr);
-uint64_t arr_sizeof(array* arr);
-void arr_copy(array* arr, uint32_t count, void* src); // TODO
-void* arr_get(array* arr, uint32_t index);
+void arr_pop(Array* arr);
+void arr_clean(Array* arr);
+void arr_free(Array* arr);
+uint64_t arr_sizeof(Array* arr);
+void arr_copy(Array* arr, uint32_t count, void* src); // TODO
+void* arr_get(Array* arr, uint32_t index);
+// void arr_sort(Array* arr);
 
 // ---------------------------------------------------------------------------------
 /*

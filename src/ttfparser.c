@@ -482,7 +482,7 @@ void ttf_glyf_data_load(ttf_core* ttf, ttf_glyf* glyf, void* file, uint32_t offs
 		uint16_t num_contours = 0;
 		uint16_t num_points = 0;
 		uint16_t num_instructions = 0;
-		array components;
+		Array components;
 		
 		arr_init(&components, sizeof(ttf_glyf));
 
@@ -738,6 +738,13 @@ typedef struct
 	char a;
 } pixel;
 
+typedef struct
+{
+	int16_t x;
+	int16_t y;
+	uint8_t flags;
+} vector;
+
 void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 {
 	pixel* bmp = (pixel*) calloc(width * height, sizeof(pixel));
@@ -752,12 +759,12 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 	ttf_glyf* glyf0 = ttf->glyf;
 
-	int16_t num_contours = glyf0->header.num_of_contours;
+	// int16_t num_contours = glyf0->header.num_of_contours;
 	uint16_t* contours = glyf0->data.end_contours;
-	uint16_t num_points = glyf0->data.num_points;
+	// uint16_t num_points = glyf0->data.num_points;
 	uint8_t* flags = glyf0->data.flags;
-	int16_t* xarr = (int16_t*) malloc(sizeof(int16_t) * num_points);
-	int16_t* yarr = (int16_t*) malloc(sizeof(int16_t) * num_points);
+	int16_t* px = glyf0->data.px;
+	int16_t* py = glyf0->data.py;
 
 	int16_t x_dimensions = abs(glyf0->header.x_min) + abs(glyf0->header.x_max);
 	int16_t y_dimensions = abs(glyf0->header.y_min) + abs(glyf0->header.y_max);
@@ -766,30 +773,208 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 	float y_scale = (float) height / (float) y_dimensions;
 	float scale;
 
-	if (x_scale <= y_scale) {
-		scale = x_scale;
-	}
-	else {
-		scale = y_scale;
+	int16_t x_min = glyf0->header.x_min;
+	int16_t y_min = glyf0->header.y_min;
+
+	if (x_scale <= y_scale) { scale = x_scale; }
+	else 					{ scale = y_scale; }
+
+	// reconstruct all the 'on the curve'-points using bezier control points
+	Array contour2;
+	arr_init(&contour2, sizeof(vector));
+	for (uint16_t i = contours[1] + 1; i <= contours[2]; i++) {
+		vector vec1 = (vector) {
+			width - ((scale * px[i]) + abs(x_min * scale)),
+			height - ((scale * py[i]) + abs(y_min * scale)),
+			flags[i]
+		};
+		arr_add(&contour2, &vec1);
+		if (!(flags[i] & 0x01) && !(flags[i + 1] & 0x01)) {
+			int16_t mid_x = (px[i] + px[i + 1]) / 2;
+			int16_t mid_y = (py[i] + py[i + 1]) / 2;
+			vector vec2 = (vector) {
+				width - ((scale * mid_x) + abs(x_min * scale)),
+				height - ((scale * mid_y) + abs(y_min * scale)),
+				0x01
+			};
+			arr_add(&contour2, &vec2);
+		}
 	}
 
-	int16_t x_smallest = 0;
-	int16_t y_smallest = 0;
+	bmp_ptr = bmp;
+	float x00, x01, x1, x2, x3, y0, y1, y2, y3, t0, t1;
+	float a, b, c, d;
+	int b0, b1;
+	int16_t tmp0, tmp1;
+	Array intersections;
+	arr_init(&intersections, sizeof(int16_t));
 	
-	for (uint16_t i = 0; i < num_points; i++) {
-		xarr[i] = (int16_t) glyf0->data.px[i] * scale;
-		yarr[i] = (int16_t) glyf0->data.py[i] * scale;
-		// yarr[i] += 15;		// TODO: somekind of lasting fix
+	for (uint32_t i = 0; i < height; i++) {
+		for (uint32_t j = 0; j < contour2.size; j++) {
+			vector* vec1 = (vector*) arr_get(&contour2, j);
+			if (vec1->flags & 0x01) {
+				vector* vec2 = (vector*) arr_get(&contour2, j + 1);
+				if (vec2->flags & 0x01) {
+					y0 = (float) i;
+					y1 = (float) vec1->y;
+					y2 = (float) vec2->y;
 
-		if (xarr[i] < x_smallest) {
-			x_smallest = xarr[i];
+					t0 = (y0 - y1) / (y2 - y1);
+
+					// t must be : 0 <= t <= 1
+					if (!(0.0f <= t0 && t0 <= 1.0f)) { continue; }
+
+					x1 = (float) vec1->x;
+					x2 = (float) vec2->x;
+					x00 = (1 - t0) * x1 + t0 * x2;
+
+					tmp0 = (int16_t) x00;
+					arr_add(&intersections, &tmp0);
+
+					// TODO: fix this thing
+					/*
+					if (vec1->x < vec2->x) {
+						arr_add(&intersections, &vec1->x);
+						arr_add(&intersections, &vec2->x);
+					}
+					else {
+						arr_add(&intersections, &vec2->x);
+						arr_add(&intersections, &vec1->x);
+					}
+					*/
+				}
+				else {
+					vector* vec3 = (vector*) arr_get(&contour2, j + 2);
+					y0 = (float) i;
+					y1 = (float) vec1->y;
+					y2 = (float) vec2->y;
+					y3 = (float) vec3->y;
+
+					a = y1 - 2 * y2 + y3;
+					b = (2 * y2) - (2 * y1);
+					c = y1 - y0;
+					
+					d = b * b - 4 * a * c;
+					
+					if (d < 0) { continue; }
+
+					t0 = (-b + sqrt(d)) / (2 * a);
+					t1 = (-b - sqrt(d)) / (2 * a);
+
+					if (!(0.0f <= t0 && t0 <= 1.0f) && !(0.0f <= t1 && t1 <= 1.0f)) {
+						continue;
+					}
+
+					x1 = (float) vec1->x;
+					x2 = (float) vec2->x;
+					x3 = (float) vec3->x;
+
+					a = x1 - 2 * x2 + x3;
+					b = (2 * x2) - (2 * x1);
+					c = x1;
+
+					if (0.0f <= t0 && t0 <= 1.0f) {
+						x00 = a * t0 * t0 + b * t0 + c;
+						b0 = 1;
+					}
+					else { b0 = 0; }
+					if (0.0f <= t1 && t1 <= 1.0f) {
+						x01 = a * t1 * t1 + b * t1 + c;
+						b1 = 1;
+					}
+					else { b1 = 0; }
+					if (t0 == t1) { b1 = 0; }
+
+					tmp0 = (int16_t) x00;
+					tmp1 = (int16_t) x01;
+					
+					if (b0 && b1) {
+						if (tmp0 < tmp1) {
+							arr_add(&intersections, &tmp0);
+							arr_add(&intersections, &tmp1);
+						}
+						else {
+							arr_add(&intersections, &tmp1);
+							arr_add(&intersections, &tmp0);
+						}
+					}
+					else if (b0) {
+						arr_add(&intersections, &tmp0);
+					}
+					else if (b1) {
+						arr_add(&intersections, &tmp1);
+					}
+					
+					/*
+					if (vec1->x < vec3->x) {
+						arr_add(&intersections, &vec1->x);
+						arr_add(&intersections, &vec3->x);
+					}
+					else {
+						arr_add(&intersections, &vec3->x);
+						arr_add(&intersections, &vec1->x);
+					}
+					*/
+				}
+			}
 		}
 
-		if (yarr[i] < y_smallest) {
-			y_smallest = yarr[i];
+		ttf_logi("[ttf_core] something\n");
+
+		for (uint32_t k = 0; k < intersections.size; k += 2) {
+			int16_t i0 = *((int16_t*) arr_get(&intersections, k));
+			int16_t i1 = *((int16_t*) arr_get(&intersections, k + 1));
+			for (uint32_t m = 0; m < abs(i1 - i0); m++) {
+				bmp[(m + i0) + (i * width)] = (pixel) { 0xff, 0xff, 0xff, 0xff };
+			}
+		}
+		arr_clean(&intersections);
+	}
+	arr_free(&intersections);
+	// arr_free(&contour2);
+
+	/*
+	// interpolate second time
+	Array contour2fin;
+	arr_init(&contour2fin, sizeof(vector));
+	for (uint32_t i = 0; i < contour2.size; i++) {
+		vector* vec1 = (vector*) arr_get(&contour2, i);
+		if(vec1->flags & 0x01) {
+			arr_add(&contour2fin, vec1);
+			vector* vec2 = (vector*) arr_get(&contour2, i + 1);
+			vector vec4;
+			if (vec2->flags & 0x01) {
+				for (uint32_t j = 0; j < 10; j++) {
+					float t = j * 0.1f;
+					int16_t x = (1 - t) * vec1->x + t * vec2->x;
+					int16_t y = (1 - t) * vec1->y + t * vec2->y;
+					vec4 = (vector) { x, y, 0x01 };
+					arr_add(&contour2fin, &vec4);
+				}
+			}
+			else {
+				vector* vec3 = (vector*) arr_get(&contour2, i + 2);
+				// ratio = 128 * scale;
+				for (uint32_t j = 0; j < 10; j++) {
+					float t = j * 0.1f;
+					
+					int16_t x = (1 - t) * (1 - t) * vec1->x +
+								2 * t * (1 - t) * vec2->x +
+								t * t * vec3->x;
+
+					int16_t y = (1 - t) * (1 - t) * vec1->y +
+								2 * t * (1 - t) * vec2->y +
+								t * t * vec3->y;
+
+					vec4 = (vector) { x, y, 0x01 };
+					arr_add(&contour2fin, &vec4);
+				}
+			}
 		}
 	}
+	*/
 
+	/*
 	pixel colors[5] = {
 		(pixel) { 0xff, 0x00, 0x00, 0xff },
 		(pixel) { 0x00, 0xff, 0x00, 0xff },
@@ -797,14 +982,30 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		(pixel) { 0xff, 0xff, 0x00, 0xff },
 		(pixel) { 0xff, 0xff, 0xff, 0xff }
 	};
-	uint32_t color_index = 0;
+	// uint32_t color_index = 0;
 
+	
+	for (uint16_t i = 0; i < contour2.size; i++) {
+		vector* vec = (vector*) arr_get(&contour2, i);
+		// int16_t x = width - (vec->x + abs(x_min * scale));
+		// int16_t y = height - (vec->y + abs(y_min * scale));
+
+		if (vec->flags & 0x01) {
+			bmp[vec->x + vec->y * width] = colors[4];
+			continue;
+		}
+		
+		bmp[vec->x + vec->y * width] = colors[0];
+	}
+	*/
+	
+	/*
 	ttf_logd("[ttf_core] contours: %hu, %hu, %hu, %hu, %hu\n",
 			 contours[0], contours[1], contours[2], contours[3], contours[4]);
-	
-	for (uint16_t i = 0; i < num_points; i++) {
-		int16_t x = width -  (xarr[i] + abs(x_smallest));
-		int16_t y = height - (yarr[i] + abs(y_smallest));
+
+	for (uint16_t i = contours[1] + 1; i <= contours[2]; i++) {
+		int16_t x = width -  (scale * (px[i] + abs(x_min)));
+		int16_t y = height -  (scale * (py[i] + abs(y_min)));
 
 		for (int16_t j = 0; j < num_contours; j++) {
 			if (i - 1 == contours[j]) {
@@ -814,28 +1015,17 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		}
 
 		if (flags[i] & 0x01) {
-			bmp[x + y * width] = colors[4];
+			bmp[x + y * width] = colors[0];
 			continue;
 		}
 
-		/*
-		if (i > 12 && i < 16) {
-			bmp[x + y * width] = colors[4];
-			continue;
-		}
-		*/
-
-		// if (i > 15) { break; }
-
-		bmp[x + y * width] = colors[color_index];
+		// bmp[x + y * width] = colors[1];
 
 		ttf_logd("[ttf_core] xy-%hu: %hi, %hi\n", i, x, y);
 	}
+	*/
 
 	ttf_logi("[ttf_core] ttf glyph 0 converted to bitmap\n");
-
-	free(xarr);
-	free(yarr);
 
 	return (void*) bmp;
 }
