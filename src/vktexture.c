@@ -8,8 +8,15 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 {
 	UPDATE_DEBUG_FILE();
 
-	uint32_t width, height;
-	void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
+	// uint32_t width, height;
+	// void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
+	
+	uint32_t width = 128;
+	uint32_t height = 128;
+	ttf_core ttf;
+	ttf_load(&ttf);
+	void* pixels = ttf_to_bmp(width, height, &ttf);
+	ttf_free(&ttf);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,

@@ -43,6 +43,20 @@ void* arr_get(array* arr, uint32_t index);
 
 // ---------------------------------------------------------------------------------
 /*
+  		memory.c
+ */
+// ---------------------------------------------------------------------------------
+
+// variadic malloc
+// vmalloc(size, &ptr, size, &ptr);
+// void vmalloc(...);		// TODO
+
+// variadic free
+// vfree(arr1, arr2, arr3, ...);
+// void vfree(...);		// TODO
+
+// ---------------------------------------------------------------------------------
+/*
   		logger.c
  */
 // ---------------------------------------------------------------------------------
@@ -249,7 +263,8 @@ typedef struct
 // cmap, glyf, head, hhea, hmtx, loca, maxp are MANDATORY
 // everything else is just additions
 
-void ttf_load();
+void ttf_load(ttf_core* ttf);
+void ttf_free(ttf_core* ttf);
 
 void ttf_head_load(ttf_core* ttf, void* file);
 void ttf_hhea_load(ttf_core* ttf, void* file);
@@ -267,6 +282,8 @@ void ttf_cmap_free(ttf_core* ttf);
 void ttf_loca_free(ttf_core* ttf);
 void ttf_glyf_data_free(ttf_glyf* glyf);
 void ttf_glyf_free(ttf_core* ttf);
+
+void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf);
 
 // ---------------------------------------------------------------------------------
 /*
