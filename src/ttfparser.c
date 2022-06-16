@@ -805,11 +805,14 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 	float x00, x01, x1, x2, x3, y0, y1, y2, y3, t0, t1;
 	float a, b, c, d;
 	int b0, b1;
-	int16_t tmp0, tmp1;
+	int16_t tmp0, tmp1, i0, i1, i2, i3;
+	uint32_t size, mod;
 	Array intersections;
 	arr_init(&intersections, sizeof(int16_t));
 	
 	for (uint32_t i = 0; i < height; i++) {
+	// for (uint32_t i = 20; i < 23; i++) {
+   	//for (uint32_t i = 21; i < 22; i++) {
 		for (uint32_t j = 0; j < contour2.size; j++) {
 			vector* vec1 = (vector*) arr_get(&contour2, j);
 			if (vec1->flags & 0x01) {
@@ -823,6 +826,7 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 					// t must be : 0 <= t <= 1
 					if (!(0.0f <= t0 && t0 <= 1.0f)) { continue; }
+					if (isinf(t0) || isnan(t0)) { continue; }
 
 					x1 = (float) vec1->x;
 					x2 = (float) vec2->x;
@@ -830,18 +834,6 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 					tmp0 = (int16_t) x00;
 					arr_add(&intersections, &tmp0);
-
-					// TODO: fix this thing
-					/*
-					if (vec1->x < vec2->x) {
-						arr_add(&intersections, &vec1->x);
-						arr_add(&intersections, &vec2->x);
-					}
-					else {
-						arr_add(&intersections, &vec2->x);
-						arr_add(&intersections, &vec1->x);
-					}
-					*/
 				}
 				else {
 					vector* vec3 = (vector*) arr_get(&contour2, j + 2);
@@ -858,9 +850,15 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 					
 					if (d < 0) { continue; }
 
-					t0 = (-b + sqrt(d)) / (2 * a);
-					t1 = (-b - sqrt(d)) / (2 * a);
-
+					if (a == 0.0f) {
+						t0 = - (c / b);
+						t1 = 0.0f / 0.0f;
+					}
+					else {
+						t0 = (-b + sqrt(d)) / (2 * a);
+						t1 = (-b - sqrt(d)) / (2 * a);
+					}
+					
 					if (!(0.0f <= t0 && t0 <= 1.0f) && !(0.0f <= t1 && t1 <= 1.0f)) {
 						continue;
 					}
@@ -904,34 +902,38 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 					else if (b1) {
 						arr_add(&intersections, &tmp1);
 					}
-					
-					/*
-					if (vec1->x < vec3->x) {
-						arr_add(&intersections, &vec1->x);
-						arr_add(&intersections, &vec3->x);
-					}
-					else {
-						arr_add(&intersections, &vec3->x);
-						arr_add(&intersections, &vec1->x);
-					}
-					*/
+					j++;
+					j++;
 				}
 			}
 		}
 
-		ttf_logi("[ttf_core] something\n");
+		ttf_logi("[ttf_core - %i] intersections.size %i\n", i, intersections.size);
 
-		for (uint32_t k = 0; k < intersections.size; k += 2) {
-			int16_t i0 = *((int16_t*) arr_get(&intersections, k));
-			int16_t i1 = *((int16_t*) arr_get(&intersections, k + 1));
-			for (uint32_t m = 0; m < abs(i1 - i0); m++) {
+		bubble_sorts(intersections.data, intersections.size);
+		size = intersections.size;
+		mod = size % 2;
+		size -= mod;
+		
+		for (uint32_t k = 0; k < size; k += 2) {
+			i0 = *((int16_t*) arr_get(&intersections, k));
+			i1 = *((int16_t*) arr_get(&intersections, k + 1));
+			for (uint32_t m = 0; m < i1 - i0; m++) {
 				bmp[(m + i0) + (i * width)] = (pixel) { 0xff, 0xff, 0xff, 0xff };
+			}
+
+			if (mod == 1) {
+				i2 = *((int16_t*) arr_get(&intersections, size - k));
+				i3 = *((int16_t*) arr_get(&intersections, size - k - 1));
+				for (uint32_t m = 0; m < i2 - i3; m++) {
+					bmp[(m + i3) + (i * width)] = (pixel) { 0xff, 0xff, 0xff, 0xff };
+				}
 			}
 		}
 		arr_clean(&intersections);
 	}
 	arr_free(&intersections);
-	// arr_free(&contour2);
+	arr_free(&contour2);
 
 	/*
 	// interpolate second time
