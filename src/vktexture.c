@@ -11,8 +11,8 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	// uint32_t width, height;
 	// void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
 	
-	uint32_t width = 128;
-	uint32_t height = 128;
+	uint32_t width = 32;
+	uint32_t height = width;
 	ttf_core ttf;
 	ttf_load(&ttf);
 	void* pixels = ttf_to_bmp(width, height, &ttf);
@@ -80,8 +80,10 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.pNext = NULL,
 		.flags = 0,
-		.magFilter = VK_FILTER_LINEAR,
-		.minFilter = VK_FILTER_LINEAR,
+		// .magFilter = VK_FILTER_LINEAR,
+		// .minFilter = VK_FILTER_LINEAR,
+		.magFilter = VK_FILTER_NEAREST,
+		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,

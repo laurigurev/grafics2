@@ -24,6 +24,8 @@
 
 // bubble sort for 'signed short'-type, aka. int16_t
 void bubble_sorts(short* arr, uint64_t size);
+// bubble sort for 'unsigned int'-type, aka. uint32_t
+void bubble_sortui(uint32_t* arr, uint64_t size);
 // TODO: add faster and better sort algorithms
 
 // ---------------------------------------------------------------------------------
@@ -45,12 +47,13 @@ void arr_add(Array* arr, void* src);
 void arr_insert();								// TODO
 void arr_insertm();								// TODO: insert multiple
 void arr_push();								// TODO
-void arr_rem();									// TODO
+void arr_remove(Array* arr, uint32_t index);
+void arr_duplicates(Array* arr);
 void arr_pop(Array* arr);
 void arr_clean(Array* arr);
 void arr_free(Array* arr);
 uint64_t arr_sizeof(Array* arr);
-void arr_copy(Array* arr, uint32_t count, void* src); // TODO
+void arr_copy(Array* arr, void* src, uint32_t count);
 void* arr_get(Array* arr, uint32_t index);
 // void arr_sort(Array* arr);
 
