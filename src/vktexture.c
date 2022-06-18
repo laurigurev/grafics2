@@ -11,7 +11,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	// uint32_t width, height;
 	// void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
 	
-	uint32_t width = 32;
+	uint32_t width = 128;
 	uint32_t height = width;
 	ttf_core ttf;
 	ttf_load(&ttf);

@@ -832,13 +832,12 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 	bmp_ptr = bmp;
 	float x00, x01, x1, x2, x3, y0, y1, y2, y3, t0, t1;
-	float a, b, c, d, tangent;
+	float a, b, c, d;
 	int b0, b1;
 	int16_t tmp0, tmp1, i0, i1;
 	uint32_t size, mod;
-	Array intersections, tangents;
+	Array intersections;
 	arr_init(&intersections, sizeof(int16_t));
-	arr_init(&tangents, sizeof(int16_t));
 	
 	for (uint32_t i = 0; i < height; i++) {
 	// for (uint32_t i = 76; i < 79; i++) {
@@ -860,22 +859,13 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 						t0 = a / b;
 
+						/*
 						// what if (y0 - y1) and/or (y2 - y1) is zero
-						if (a==0 && b==0) {
-							// ttf_logd("[ttf_core] i %i, j %i\n", i, j);
-							// x1 = (float) vec1->x;
-							// x2 = (float) vec2->x;
-
-							// tmp0 = (int16_t) x1;
-							// tmp0 = (int16_t) x2;
-
-							// arr_add(&tangents, &tmp0);
-							// arr_add(&tangents, &tmp1);
-							
-							j++;
-							continue;
-						}
 						// so lines are horizontal together
+						if (a==0 && b==0) {
+							// continue;
+						}
+						*/
 
 						// t must be : 0 <= t <= 1
 						if (!(0.0f <= t0 && t0 <= 1.0f)) { continue; }
@@ -887,8 +877,6 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 						tmp0 = (int16_t) x00;
 						arr_add(&intersections, &tmp0);
-
-						// j++;
 					}
 					else {
 						vectorf* vec3 = (vectorf*) arr_get(contour, j + 2);
@@ -902,8 +890,6 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 						b = (2 * y2) - (2 * y1);
 						c = y1 - y0;
 
-						tangent = 2 * a + b;
-					
 						d = b * b - 4 * a * c;
 					
 						if (d < 0) { continue; }
@@ -939,7 +925,7 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 							b1 = 1;
 						}
 						else { b1 = 0; }
-						if (t0 == t1) { b1 = 0; }
+						if (t0 == t1 && t0 != 1.0f) { b1 = 0; }
 
 						tmp0 = (int16_t) x00;
 						tmp1 = (int16_t) x01;
@@ -953,61 +939,25 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 								arr_add(&intersections, &tmp1);
 								arr_add(&intersections, &tmp0);
 							}
+							j++;
+							j++;
 						}
 						else if (b0) {
 							arr_add(&intersections, &tmp0);
 
-							// if point is a peak or valley, we
-							// need to create a duplicate, because
-							// otherwise there is going to be unequal
-							// amount of intersections
-
-							a = y1 - 2 * y2 + y3;
-							b = (2 * y2) - (2 * y1);
-							tangent = 2 * a * t0 + b;
-							
-							if (tangent == 0.0f) { arr_add(&tangents, &tmp0); }
+							if (t0 == 1.0f) { j++, j++; }
 						}
 						else if (b1) {
 							arr_add(&intersections, &tmp1);
 
-							// if point is a peak or valley, we
-							// need to create a duplicate, because
-							// otherwise there is going to be unequal
-							// amount of intersections
-
-							a = y1 - 2 * y2 + y3;
-							b = (2 * y2) - (2 * y1);
-							tangent = 2 * a * t1 + b;
-							
-							if (tangent == 0.0f) { arr_add(&tangents, &tmp1); }
+							if (t1 == 1.0f) { j++, j++; }
 						}
-						// j++;
-						// j++;
 					}
 				}
 			}
 		}
 
-		/*
-		ttf_logi("[ttf_core - %i] intersections.size %i, tangents.size %i\n",
-				 i, intersections.size, tangents.size);
-		*/
-		
-		arr_duplicates(&intersections);
-		
-		size = intersections.size;
-		mod = size % 2;
-
-		if (mod == 1) {
-			// copy all tangents to intersections
-			arr_duplicates(&tangents);
-			arr_copy(&intersections, tangents.data, tangents.size);
-			ttf_logd("[ttf_core] tangents are added!\n");
-		}
-
-		ttf_logi("[ttf_core - %i] intersections.size %i, tangents.size %i\n",
-				 i, intersections.size, tangents.size);
+		ttf_logi("[ttf_core - %i] intersections.size %i\n", i, intersections.size);
 
 		size = intersections.size;
 		mod = size % 2;
@@ -1022,7 +972,6 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 			}
 		}
 		arr_clean(&intersections);
-		arr_clean(&tangents);
 	}
 	arr_free(&intersections);
 	// arr_free(&contour2);
