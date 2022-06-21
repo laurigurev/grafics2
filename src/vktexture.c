@@ -11,11 +11,59 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	// uint32_t width, height;
 	// void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
 	
-	uint32_t width = 128;
+	uint32_t width = 512;
+	// uint32_t width = 64;
 	uint32_t height = width;
 	ttf_core ttf;
 	ttf_load(&ttf);
-	void* pixels = ttf_to_bmp(width, height, &ttf);
+	const char letters[] = "abcdefghijklmnopqrstuvwzxy+-*^!?0123456789ABCDEFGHIJKLMNOPQRSTUV\0";
+	assert(strlen(letters) == 64);
+	void* atlas = malloc(sizeof(pixel) * width * height);
+
+	/*
+	pixel* bmp_ptr = (pixel*) atlas;
+	for (uint32_t i = 0; i < height; i++) {
+		for (uint32_t j = 0; j < width; j++) {
+			// bmp_ptr->a = 0xff;
+			*bmp_ptr = (pixel) { 0xff, 0x00, 0xff, 0xff };
+			bmp_ptr++;
+		}
+	}
+	*/
+
+	/*
+	i64 size = sizeof(pixel);
+	i64 ws = size * width;
+	for (i32 i = 0; i < strlen(letters); i++) {
+		void* tmp = (pixel*) ttf_to_bmp(letters[i], 128, 128, &ttf);
+		i64 ii =  i / 4;
+		for (i32 j = 0; j < 128; j++) {
+			memcpy(atlas + size * width * j + size * 128 * i + size * width * 128 * ii,
+				   tmp + size * 128 * j,
+				   size * 128);
+			memcpy(atlas + ws * j + size * 128 * (3 - i) + ws * 129 * ii,
+				   tmp + size * 128 * j,
+				   size * 128);
+		}
+		
+		bmp_free(tmp);
+	}
+	*/
+	i64 size = sizeof(pixel);
+	i64 ws = size * width;
+	// for (i32 i = 0; i < strlen(letters) - 31; i++) {
+	for (i32 i = 0; i < strlen(letters); i++) {
+		void* tmp = (pixel*) ttf_to_bmp(letters[i], 64, 64, &ttf);
+		i64 ii =  i / 8;
+		for (i32 j = 0; j < 64; j++) {
+			memcpy(atlas + ws * j + size * 64 * (7 - i) + ws * 65 * ii,
+				   tmp + size * 64 * j,
+				   size * 64);
+		}
+		
+		bmp_free(tmp);
+	}
+    // void* pixels = ttf_to_bmp('0', width, height, &ttf);
 	ttf_free(&ttf);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
@@ -47,7 +95,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 
 	VkVirtualBuffer stage;
 	vkvbufferalloc(&stage, bufalloc, 0, width*height*4);
-	stage.src = pixels;
+	stage.src = atlas;
 	memcpy(stage.dst, stage.src, stage.size);
 	
 	vkcopybuftoimg(texture, bp, core, &stage, width, height);
@@ -105,7 +153,8 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	logt("VkTexture.sampler created\n");
 
 	vkvbufferret(&stage, bufalloc);
-	bmp_free(pixels);
+	// bmp_free(pixels);
+	bmp_free(atlas);
 
 	logt("VkTexture created\n");
 }

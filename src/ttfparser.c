@@ -672,19 +672,32 @@ void ttf_cmap_format4_table_load(ttf_cmap* cmap, void* file)
 	memcpy(format->id_delta, file + offset, sizeof(uint16_t) * seg_count);
 	offset += sizeof(uint16_t) * seg_count;
 
-	format->id_range_offset = (uint16_t*) malloc(sizeof(uint16_t) * seg_count);	
-	memcpy(format->id_range_offset, file + offset, sizeof(uint16_t) * seg_count);
-	offset += sizeof(uint16_t) * seg_count;
+	// NOTE: i don't know why this works
+	i64 len = format->length - 16 - 3 * 2 * seg_count;
+	format->id_range_offset = (u16*) malloc(len);
+	memcpy(format->id_range_offset, file + offset, len);
+	offset += len;
+	
+	// format->id_range_offset = (uint16_t*) malloc(sizeof(uint16_t) * seg_count);	
+	// memcpy(format->id_range_offset, file + offset, sizeof(uint16_t) * seg_count);
+	// offset += sizeof(uint16_t) * seg_count;
 
 	for (uint16_t i = 0; i < seg_count; i++) {
 		format->end_code[i] = ENDIAN_WORD(format->end_code[i]);
 		format->start_code[i] = ENDIAN_WORD(format->start_code[i]);
 		format->id_delta[i] = ENDIAN_WORD(format->id_delta[i]);
+		// format->id_range_offset[i] = ENDIAN_WORD(format->id_range_offset[i]);
+	}
+
+	// NOTE: i don't know why this works
+	for (i64 i = 0; i < len / 2; i++) {
 		format->id_range_offset[i] = ENDIAN_WORD(format->id_range_offset[i]);
 	}
 
-	format->glyph_index_array = (uint16_t*) malloc(sizeof(uint16_t) * TTF_GLYPH_TABLE_SIZE);
-	memcpy(format->glyph_index_array, file + offset, sizeof(uint16_t) * TTF_GLYPH_TABLE_SIZE);
+	// format->glyph_index_array = (uint16_t*) malloc(sizeof(uint16_t) *
+	// TTF_GLYPH_TABLE_SIZE);
+	// memcpy(format->glyph_index_array, file + offset,
+	// sizeof(uint16_t) * TTF_GLYPH_TABLE_SIZE);
 }
 
 void ttf_hmtx_free(ttf_core* ttf)
@@ -701,7 +714,7 @@ void ttf_cmap_free(ttf_core* ttf)
 	free(ttf->cmap->format.start_code);
 	free(ttf->cmap->format.id_delta);
 	free(ttf->cmap->format.id_range_offset);
-	free(ttf->cmap->format.glyph_index_array);
+	// free(ttf->cmap->format.glyph_index_array);
 	free(ttf->cmap);
 }
 
@@ -730,29 +743,34 @@ void ttf_glyf_free(ttf_core* ttf)
 	free(ttf->glyf);
 }
 
-typedef struct
+int ttf_glyph_index_get(ttf_core* ttf, u16 code_point)
 {
-	char r;
-	char g;
-	char b;
-	char a;
-} pixel;
+	ttf_cmap_format4* format = &ttf->cmap->format;
+	u16 seg_count = format->seg_count_2 / 2;
+	i32 index = -1;
+	u16* ptr;
+	for (u16 i = 0; i < seg_count; i++) {
+		if (code_point <= format->end_code[i]) { index = i; break; }
+	}
 
-typedef struct
-{
-	int16_t x;
-	int16_t y;
-	uint8_t flags;
-} vector;
+	if (index == -1) { return 0; }
 
-typedef struct
-{
-	float x;
-	float y;
-	uint8_t flag;
-} vectorf;
+	if (format->start_code[index] < code_point) {
+		if (format->id_range_offset != 0) {
+			ptr = &format->id_range_offset[index] + format->id_range_offset[index] / 2;
+			ptr += (code_point - format->start_code[index]);
+			if (ptr == NULL) { return 0; }
+			return (*ptr + format->id_delta[index]) % 65536;
+		}
+		else {
+			return (code_point + format->id_delta[index]) % 65536;
+		}
+	}
 
-void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
+	return 0;
+}
+
+void* ttf_to_bmp(char ch, uint32_t width, uint32_t height, ttf_core* ttf)
 {
 	pixel* bmp = (pixel*) calloc(width * height, sizeof(pixel));
 
@@ -764,7 +782,8 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		}
 	}
 
-	ttf_glyf* glyf0 = ttf->glyf;
+	i32 glyph_id = ttf_glyph_index_get(ttf, ch);
+	ttf_glyf* glyf0 = ttf->glyf + glyph_id;
 
 	int16_t num_contours = glyf0->header.num_of_contours;
 	uint16_t* contours = glyf0->data.end_contours;
@@ -788,6 +807,8 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 	float scale = (float) height / (float) ttf->head->units_per_em;
 
+	// ttf_logd("[ttf_core] x_min %i, y_min %i, scale %f\n", x_min, y_min, scale);
+
 	Array contours_arr;
 	arr_init(&contours_arr, sizeof(Array));
 	int16_t firsti, lasti;
@@ -795,8 +816,9 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		// Array contour2;
 		// arr_init(&contour2, sizeof(vectorf));
 		Array contour;
-		arr_init(&contour, sizeof(vectorf));
+		arr_init(&contour, sizeof(ttf_vector2f));
 
+		// TODO: fix how contours are setup
 		if (ci == 0) {
 			firsti = 0;
 			lasti = contours[ci]; 
@@ -804,11 +826,13 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		else {
 			firsti = contours[ci - 1] + 1;
 			lasti = contours[ci];
+			// lasti = contours[ci] + 1; // previous version
 		}
 		
-		for (uint16_t i = firsti; i <= lasti; i++) {
+		// for (uint16_t i = firsti; i <= lasti; i++) {
+		for (uint16_t i = firsti; i < lasti; i++) {
 			// for (uint16_t i = 0; i <= contours[1]; i++) {
-			vectorf vec1 = (vectorf) {
+			ttf_vector2f vec1 = (ttf_vector2f) {
 				width - ((scale * px[i]) + abs(x_min * scale)),
 				height - ((scale * py[i]) + abs(y_min * scale)),
 				flags[i]
@@ -818,12 +842,22 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 			if (!(flags[i] & 0x01) && !(flags[i + 1] & 0x01)) {
 				float mid_x = (px[i] + px[i + 1]) / 2;
 				float mid_y = (py[i] + py[i + 1]) / 2;
-				vectorf vec2 = (vectorf) {
+				ttf_vector2f vec2 = (ttf_vector2f) {
 					width - ((scale * mid_x) + abs(x_min * scale)),
 					height - ((scale * mid_y) + abs(y_min * scale)),
 					0x01
 				};
 				// arr_add(&contour2, &vec2);
+				/*
+				if (vec2.y <= 0) {
+					ttf_loge("[ttf_contour] ci %i, i %i\n", ci, i);
+					ttf_loge("[ttf_contour] mid_x %f, mid_y %f\n", mid_x, mid_y);
+					ttf_loge("[ttf_contour] x %i, y %i, flag %c\n",
+							 vec2.x, vec2.y, vec2.flag);
+					flushl();
+					assert(false);
+				}
+				*/
 				arr_add(&contour, &vec2);
 			}
 		}
@@ -845,9 +879,9 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		for (uint32_t ci = 0; ci < contours_arr.size; ci++) {
 			Array* contour = (Array*) arr_get(&contours_arr, ci);
 			for (uint32_t j = 0; j < contour->size; j++) {
-				vectorf* vec1 = (vectorf*) arr_get(contour, j);
+				ttf_vector2f* vec1 = (ttf_vector2f*) arr_get(contour, j);
 				if (vec1->flag & 0x01) {
-					vectorf* vec2 = (vectorf*) arr_get(contour, j + 1);
+					ttf_vector2f* vec2 = (ttf_vector2f*) arr_get(contour, j + 1);
 					if (vec2->flag & 0x01) {
 						y0 = (float) i;
 						// y0 += 0.5f;
@@ -877,9 +911,13 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 						tmp0 = (int16_t) x00;
 						arr_add(&intersections, &tmp0);
+						/*
+						ttf_logi("[ttf_core0] j = %i, intersections.size %i\n",
+								 j, intersections.size);
+						*/
 					}
 					else {
-						vectorf* vec3 = (vectorf*) arr_get(contour, j + 2);
+						ttf_vector2f* vec3 = (ttf_vector2f*) arr_get(contour, j + 2);
 						y0 = (float) i;
 						// y0 += 0.5f;
 						y1 = (float) vec1->y;
@@ -891,6 +929,8 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 						c = y1 - y0;
 
 						d = b * b - 4 * a * c;
+
+						// ttf_logd("[ttf_core1] a %f, b %f, c %f, d %f\n",a, b, c, d);
 					
 						if (d < 0) { continue; }
 
@@ -952,12 +992,26 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 
 							if (t1 == 1.0f) { j++, j++; }
 						}
+
+						/*
+						ttf_logi("[ttf_core1] j = %i, intersections.size %i\n",
+								  j, intersections.size);
+						ttf_logd("[ttf_core1] a %f, b %f, c %f, d %f, t0 %f, t1 %f, b0 %i, b1 %i\n",
+								 a, b, c, d, t0, t1, b0, b1);
+						ttf_logd("[ttf_core1] y0 %f, y1 %f, y2 %f, y3 %f\n",
+								 y0, y1, y2, y3);
+						ttf_logd("[ttf_core1] y0 %i, y1 %i, y2 %i, y3 %i\n",
+								 i, vec1->y, vec2->y, vec3->y);
+						*/
 					}
 				}
 			}
 		}
 
+		/*
 		ttf_logi("[ttf_core - %i] intersections.size %i\n", i, intersections.size);
+		flushl();
+		*/
 
 		size = intersections.size;
 		mod = size % 2;
@@ -967,6 +1021,11 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		for (uint32_t k = 0; k < size; k += 2) {
 			i0 = *((int16_t*) arr_get(&intersections, k));
 			i1 = *((int16_t*) arr_get(&intersections, k + 1));
+
+			assert(i0 <= i1);
+			assert(0 <= i0);
+			assert(0 <= i1);
+			
 			for (uint32_t m = 0; m < i1 - i0; m++) {
 				bmp[(m + i0) + (i * width)] = (pixel) { 0xff, 0xff, 0xff, 0xff };
 			}
@@ -974,7 +1033,6 @@ void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf)
 		arr_clean(&intersections);
 	}
 	arr_free(&intersections);
-	// arr_free(&contour2);
 	for (uint32_t ci = 0; ci < contours_arr.size; ci++) {
 		Array* arr = arr_get(&contours_arr, ci);
 		arr_free(arr);

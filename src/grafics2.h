@@ -18,6 +18,29 @@
 
 // ---------------------------------------------------------------------------------
 /*
+  		utils.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct
+{
+	char r;
+	char g;
+	char b;
+	char a;
+} pixel;
+
+typedef long 			i64;
+typedef unsigned long 	u64;
+typedef int 			i32;
+typedef unsigned int 	u32;
+typedef short 			i16;
+typedef unsigned short 	u16;
+typedef char 			i8;
+typedef unsigned char 	u8;
+
+// ---------------------------------------------------------------------------------
+/*
   		sort.c
  */
 // ---------------------------------------------------------------------------------
@@ -276,6 +299,13 @@ typedef struct
 	ttf_glyf* glyf;
 } ttf_core;
 
+typedef struct
+{
+	float x;
+	float y;
+	uint8_t flag;
+} ttf_vector2f;
+
 // cmap, glyf, head, hhea, hmtx, loca, maxp are MANDATORY
 // everything else is just additions
 
@@ -299,7 +329,9 @@ void ttf_loca_free(ttf_core* ttf);
 void ttf_glyf_data_free(ttf_glyf* glyf);
 void ttf_glyf_free(ttf_core* ttf);
 
-void* ttf_to_bmp(uint32_t width, uint32_t height, ttf_core* ttf);
+int ttf_glyph_index_get(ttf_core* ttf, u16 code_point);
+void* ttf_to_bmp(char ch, uint32_t width, uint32_t height, ttf_core* ttf);
+void* ttf_textureatlas_generate();		// TODO
 
 // ---------------------------------------------------------------------------------
 /*

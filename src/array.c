@@ -60,9 +60,9 @@ void arr_pop(Array* arr)
 
 void arr_clean(Array* arr)
 {
-	if (arr->size != 0) {
+	if (arr->data != NULL) {
 		// this is memory safe, might be unnecessary
-		memset(arr->data + (arr->stride * arr->size), 0, arr->stride * arr->size);
+		memset(arr->data, 0, arr->stride * arr->size);
 		arr->size = 0;
 	}
 }
