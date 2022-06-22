@@ -425,6 +425,74 @@ void vkcored(VkCore* core, VkBoilerplate* bp);
 
 // ---------------------------------------------------------------------------------
 /*
+  		vkma_allocator.c
+ */
+// ---------------------------------------------------------------------------------
+
+// TODO: comments
+
+typedef struct VkmaSubAllocation_t
+{
+	u64 size;
+	u64 offset;
+} VkmaSubAllocation;
+
+typedef struct VkmaAllocator_t VkmaAllocator;
+typedef struct VkmaHeap_t VkmaHeap;
+typedef struct VkmaBlock_t VkmaBlock;
+typedef struct VkmaAllocatorCreateInfo_t
+{
+	VkPhysicalDevice physicalDevice;
+	VkDevice device;
+} VkmaAllocatorCreateInfo;
+
+typedef enum VkmaAllocationUsageFlagBits_t
+{
+	VKMA_ALLOCATION_USAGE_AUTO = 0x01,
+	VKMA_ALLOCATION_USAGE_HOST = 0x02,
+	VKMA_ALLOCATION_USAGE_DEVICE = 0x04
+	// VKMA_ALLOCATION_USAGE_AUTO_PREFER_HOST = 0x08,		// not implmented
+	// VKMA_ALLOCATION_USAGE_AUTO_PREFER_DEVICE = 0x10		// not implmented
+} VkmaAllocationUsageFlagBits;
+typedef VkFlags VkmaAllocationUsageFlags;
+
+typedef enum VkmaAllocationCreateFlagBits_t
+{
+	VKMA_ALLOCATION_CREATE_MAPPED = 0x01,
+	VKMA_ALLOCATION_CREATE_DONT_CREATE = 0x02,
+	VKMA_ALLOCATION_CREATE_DONT_BIND = 0x04,
+	VKMA_ALLOCATION_CREATE_DONT_ALLOCATE = 0x08,
+	VKMA_ALLOCATION_CREATE_HOST_RANDOM_ACCESS = 0x10,	// for multithreaded stuff
+	VKMA_ALLOCATION_CREATE_HOST_SEQUENTIAL_WRITE = 0x20
+} VkmaAllocationCreateFlagBits;
+typedef VkFlags VkmaAllocationCreateFlags;
+
+typedef struct VkmaAllocation_t VkmaAllocation;
+typedef struct VkmaAllocationInfo_t
+{
+	VkmaAllocationUsageFlags usage;
+	VkmaAllocationCreateFlags create;
+	const char* name;
+	void* pMappedPtr;
+} VkmaAllocationInfo;
+
+VkResult vkmaCreateAllocator(VkmaAllocator* allocator, VkmaAllocatorCreateInfo* info);
+VkResult vkmaCreateBuffer(VkmaAllocator* allocator,
+						  VkBufferCreateInfo* bufferInfo, VkBuffer* buffer,
+						  VkmaAllocationInfo* allocInfo, VkmaAllocation* allocation);
+VkResult vkmaCreateImage(VkmaAllocator* allocator,
+						 VkImageCreateInfo* imageInfo, VkImage* image,
+						 VkmaAllocationInfo* allocInfo, VkmaAllocation* allocation);
+
+VkResult vkmaMapMemory(VkmaAllocator* allocator, VkmaAllocation* allocation, void** ptr);
+void vkmaUnmapMemory();		// ???
+
+VkResult vkmaDestroyAllocator();
+VkResult vkmaDestroyBuffer();
+VkResult vkmaDestroyImage();
+
+// ---------------------------------------------------------------------------------
+/*
   		vkpool.c
  */
 // ---------------------------------------------------------------------------------
