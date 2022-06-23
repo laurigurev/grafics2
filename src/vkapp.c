@@ -5,27 +5,22 @@
 
 void vkappc(VkApp* app, Window* window)
 {
+	VkResult result;
+	VkBoilerplate* bp = &app->boilerplate;
+	
 	vkboilerplatec(&app->boilerplate, window);
 	vkcorec(&app->core, &app->boilerplate, window);
 
-	VkPoolInfo pool_infos[2] = {
-		(VkPoolInfo) {
-			.property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			.size = GIGABYTE
-		},
-		(VkPoolInfo) {
-			.property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			.size = GIGABYTE
-		}
+	VkmaAllocatorCreateInfo alloc_info = {
+		bp->phydev, bp->dev
 	};
-	
-	VkMemoryAllocatorInfo memalloc_info = (VkMemoryAllocatorInfo) {
-		.pool_info_count = 2,
-		.pool_infos = pool_infos
-	};
-	vkmemallocc(&app->memalloc, &memalloc_info, &app->boilerplate);
-	vkbufferallocc(&app->buffalloc, &app->memalloc, &app->boilerplate);
+	result = vkmaCreateAllocator(&app->memory_allocator, &alloc_info);
+	assert(result == VK_SUCCESS);
+
+	VkbaAllocatorCreateInfo bAlloc_info = { &app->memory_allocator, bp->dev, bp->queue };
+	vkbaCreateAllocator(&app->buffer_allocator, &bAlloc_info);
+
+	flushl();
 
 	VkDescriptorPoolSize dpool_size = {
 		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -41,14 +36,17 @@ void vkappc(VkApp* app, Window* window)
 		.pPoolSizes = &dpool_size
 	};
 
-	VkBoilerplate* bp = &app->boilerplate;
 	UPDATE_DEBUG_FILE();
 	UPDATE_DEBUG_LINE();
-	VkResult res = vkCreateDescriptorPool(bp->dev, &dpool_info, NULL, &app->dpool);
-	assert(res == VK_SUCCESS);
+	result = vkCreateDescriptorPool(bp->dev, &dpool_info, NULL, &app->dpool);
+	assert(result == VK_SUCCESS);
 	logt("VkDescriptorPool created\n");
 
+	/*
 	vkdoodadc(&app->doodad, &app->buffalloc, &app->memalloc,
+			  &app->core, &app->boilerplate, &app->dpool);
+	*/
+	vkdoodadc(&app->doodad, &app->buffer_allocator, &app->memory_allocator,
 			  &app->core, &app->boilerplate, &app->dpool);
 	app->current_frame = 0;
 }
@@ -57,9 +55,11 @@ void vkappd(VkApp* app)
 {
 	vkDeviceWaitIdle(app->boilerplate.dev);
 	vkDestroyDescriptorPool(app->boilerplate.dev, app->dpool, NULL);
-	vkdoodadd(&app->doodad, &app->buffalloc, &app->boilerplate);
-	vkbufferallocd(&app->buffalloc, &app->boilerplate);
-	vkmemallocd(&app->memalloc, &app->boilerplate);
+	// vkdoodadd(&app->doodad, &app->buffalloc, &app->boilerplate);
+	vkdoodadd(&app->doodad, &app->buffer_allocator, &app->boilerplate,
+			  &app->memory_allocator);
+	vkbaDestroyAllocator(&app->buffer_allocator, &app->memory_allocator);
+	vkmaDestroyAllocator(&app->memory_allocator);
 	vkcored(&app->core, &app->boilerplate);
 	vkboilerplated(&app->boilerplate);
 	flushl();

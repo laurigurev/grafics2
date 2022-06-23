@@ -20,6 +20,15 @@ void arr_add(Array* arr, void* src)
 	}
 }
 
+void arr_push(Array* arr)
+{
+	arr->size++;
+	if (arr->size == arr->alloc_size) {
+		arr->alloc_size *= 2;
+		arr->data = realloc(arr->data, arr->stride * arr->alloc_size);
+	}
+}
+
 void arr_remove(Array* arr, uint32_t index)
 {
 	index = index % arr->size;

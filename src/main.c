@@ -14,16 +14,16 @@ int main()
 	Window win;
 	windowc(&win, "grafics2.exe", 750, 750);
 
-	VkApp app;
-	vkappc(&app, &win);
+	VkApp* app = (VkApp*) malloc(sizeof(VkApp));
+	vkappc(app, &win);
 	
 	while (!win.should_close)
 	{
 		wpoll_events(&win);
-		vkrender(&app);
+		vkrender(app);
 	}
 
-	vkappd(&app);
+	vkappd(app);
 	windowd(&win);
 	
 	log_close();

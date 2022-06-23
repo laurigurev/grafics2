@@ -3,12 +3,17 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
+/*
 void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, 
+			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
+*/
+void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
 			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
 {
 	UPDATE_DEBUG_FILE();
 
-	vktexturec(&doodad->texture, bp, core, memalloc, bufalloc);
+	// vktexturec(&doodad->texture, bp, core, memalloc, bufalloc);
+	vktexturec(&doodad->texture, bp, core, mAllocator, bAllocator);
 
 	VkDescriptorSetLayoutBinding dlayout_binding = {
 		.binding = 0,
@@ -129,10 +134,14 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator*
 		{ {  0.5f,  0.5f }, { 0.0f, 1.0f } },
 		{ { -0.5f,  0.5f }, { 1.0f, 1.0f } }
 	};
-	vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, sizeof(Vertex) * 4, vertices);
+	// vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, sizeof(Vertex) * 4, vertices);
+	VkbaVirtualBufferInfo tmpBufferInfo = { DEVICE_INDEX, sizeof(Vertex) * 4, vertices };
+	vkbaStageVirtualBuffer(bAllocator, &doodad->vertexbuff, &tmpBufferInfo);
 
 	uint32_t indices[6] = { 0, 1, 3, 1, 2, 3 };
-	vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 6*4, indices);
+	// vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 6*4, indices);
+	tmpBufferInfo = (VkbaVirtualBufferInfo) { DEVICE_INDEX, sizeof(u32) * 6, indices };
+	vkbaStageVirtualBuffer(bAllocator, &doodad->indexbuff, &tmpBufferInfo);
 
 	VkVertexInputBindingDescription vibd = (VkVertexInputBindingDescription) {
 		.binding = 0,
@@ -322,7 +331,9 @@ void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator*
 	file_free(fragment_shader);
 }
 
-void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
+// void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
+void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
+			   VkBoilerplate* bp, VkmaAllocator* mAllocator)
 {
 	UPDATE_DEBUG_FILE();
 
@@ -338,10 +349,12 @@ void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 	vkDestroyPipeline(bp->dev, doodad->pipeline, NULL);
 	logt("VkPipeline destroyed\n");
 
-	vkvbufferret(&doodad->vertexbuff, bufalloc);
-	vkvbufferret(&doodad->indexbuff, bufalloc);
+	// vkvbufferret(&doodad->vertexbuff, bufalloc);
+	// vkvbufferret(&doodad->indexbuff, bufalloc);
+	vkbaDestroyVirtualBuffer(bAllocator, &doodad->vertexbuff);
+	vkbaDestroyVirtualBuffer(bAllocator, &doodad->indexbuff);
 
-	vktextured(&doodad->texture, bp);
+	vktextured(&doodad->texture, bp, mAllocator);
 
 	logt("VkDoodad destroyed\n");
 }
@@ -349,10 +362,12 @@ void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame)
 {
 	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
-	vkCmdBindVertexBuffers2EXTproxy(cmdbuf, 0, 1, &doodad->vertexbuff.bufferc,
-									&doodad->vertexbuff.offset, &doodad->vertexbuff.size,
+	vkCmdBindVertexBuffers2EXTproxy(cmdbuf, 0, 1, &doodad->vertexbuff.buffer,
+									&doodad->vertexbuff.locale.offset,
+									&doodad->vertexbuff.locale.size,
 									NULL);
-	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.bufferc, doodad->indexbuff.offset, 
+	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.buffer,
+						 doodad->indexbuff.locale.offset, 
 						 VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
 							doodad->pipeline_layout, 0, 1,

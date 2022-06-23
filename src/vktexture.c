@@ -3,68 +3,18 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
+/*
 void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 				VkMemoryAllocator* memalloc, VkBufferAllocator* bufalloc)
+*/
+void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
+				VkmaAllocator* mAllocator, VkbaAllocator* bAllocator)
 {
 	UPDATE_DEBUG_FILE();
+	VkResult result;
 
-	// uint32_t width, height;
-	// void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
-	
-	uint32_t width = 512;
-	// uint32_t width = 64;
-	uint32_t height = width;
-	ttf_core ttf;
-	ttf_load(&ttf);
-	const char letters[] = "abcdefghijklmnopqrstuvwzxy+-*^!?0123456789ABCDEFGHIJKLMNOPQRSTUV\0";
-	assert(strlen(letters) == 64);
-	void* atlas = malloc(sizeof(pixel) * width * height);
-
-	/*
-	pixel* bmp_ptr = (pixel*) atlas;
-	for (uint32_t i = 0; i < height; i++) {
-		for (uint32_t j = 0; j < width; j++) {
-			// bmp_ptr->a = 0xff;
-			*bmp_ptr = (pixel) { 0xff, 0x00, 0xff, 0xff };
-			bmp_ptr++;
-		}
-	}
-	*/
-
-	/*
-	i64 size = sizeof(pixel);
-	i64 ws = size * width;
-	for (i32 i = 0; i < strlen(letters); i++) {
-		void* tmp = (pixel*) ttf_to_bmp(letters[i], 128, 128, &ttf);
-		i64 ii =  i / 4;
-		for (i32 j = 0; j < 128; j++) {
-			memcpy(atlas + size * width * j + size * 128 * i + size * width * 128 * ii,
-				   tmp + size * 128 * j,
-				   size * 128);
-			memcpy(atlas + ws * j + size * 128 * (3 - i) + ws * 129 * ii,
-				   tmp + size * 128 * j,
-				   size * 128);
-		}
-		
-		bmp_free(tmp);
-	}
-	*/
-	i64 size = sizeof(pixel);
-	i64 ws = size * width;
-	// for (i32 i = 0; i < strlen(letters) - 31; i++) {
-	for (i32 i = 0; i < strlen(letters); i++) {
-		void* tmp = (pixel*) ttf_to_bmp(letters[i], 64, 64, &ttf);
-		i64 ii =  i / 8;
-		for (i32 j = 0; j < 64; j++) {
-			memcpy(atlas + ws * j + size * 64 * (7 - i) + ws * 65 * ii,
-				   tmp + size * 64 * j,
-				   size * 64);
-		}
-		
-		bmp_free(tmp);
-	}
-    // void* pixels = ttf_to_bmp('0', width, height, &ttf);
-	ttf_free(&ttf);
+	uint32_t width, height;
+	void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -84,21 +34,42 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
 	};
 
+	/*
 	UPDATE_DEBUG_LINE();
 	VkResult res = vkCreateImage(bp->dev, &image_info, NULL, &texture->image);
 	assert(res == VK_SUCCESS);
 	logt("VkTexture.image created\n");
 
 	vkmemallocimg(memalloc, bp, &texture->image);
+	*/
+
+	VkmaAllocationInfo allocInfo = {
+		VKMA_ALLOCATION_USAGE_DEVICE,
+		0,
+		"TEXTURE",
+		NULL
+	};
+	
+	result = vkmaCreateImage(mAllocator, &image_info, &texture->image,
+							 &allocInfo, &texture->allocation);
+	assert(result == VK_SUCCESS);
+	
 	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
 						  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
+	/*
 	VkVirtualBuffer stage;
 	vkvbufferalloc(&stage, bufalloc, 0, width*height*4);
-	stage.src = atlas;
+	stage.src = pixels;
 	memcpy(stage.dst, stage.src, stage.size);
+	*/
+	VkbaVirtualBuffer stagingBuffer;
+	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height * 4, pixels };
+	result = vkbaCreateVirtualBuffer(bAllocator, &stagingBuffer, &tmpBufferInfo);
+	memcpy(stagingBuffer.dst, stagingBuffer.src, stagingBuffer.locale.size);
 	
-	vkcopybuftoimg(texture, bp, core, &stage, width, height);
+	// vkcopybuftoimg(texture, bp, core, &stage, width, height);
+	vkcopybuftoimg(texture, bp, core, &stagingBuffer, width, height);
 	
 	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
 						  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -117,8 +88,8 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	};
 
 	UPDATE_DEBUG_LINE();
-	res = vkCreateImageView(bp->dev, &view_info, NULL, &texture->view);
-	assert(res == VK_SUCCESS);
+	result = vkCreateImageView(bp->dev, &view_info, NULL, &texture->view);
+	assert(result == VK_SUCCESS);
 	logt("VkTexture.view created\n");
 
 	VkPhysicalDeviceProperties phydev_properties;
@@ -148,22 +119,24 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	};
 
 	UPDATE_DEBUG_LINE();
-	res =  vkCreateSampler(bp->dev, &sampler_info, NULL, &texture->sampler);
-	assert(res == VK_SUCCESS);
+	result =  vkCreateSampler(bp->dev, &sampler_info, NULL, &texture->sampler);
+	assert(result == VK_SUCCESS);
 	logt("VkTexture.sampler created\n");
 
-	vkvbufferret(&stage, bufalloc);
-	// bmp_free(pixels);
-	bmp_free(atlas);
+	// vkvbufferret(&stage, bufalloc);
+	vkbaDestroyVirtualBuffer(bAllocator, &stagingBuffer);
+	bmp_free(pixels);
 
 	logt("VkTexture created\n");
 }
 
-void vktextured(VkTexture* texture, VkBoilerplate* bp)
+// void vktextured(VkTexture* texture, VkBoilerplate* bp)
+void vktextured(VkTexture* texture, VkBoilerplate* bp, VkmaAllocator* mAllocator)
 {
 	vkDestroySampler(bp->dev, texture->sampler, NULL);
 	vkDestroyImageView(bp->dev, texture->view, NULL);
-	vkDestroyImage(bp->dev, texture->image, NULL);
+	// vkDestroyImage(bp->dev, texture->image, NULL);
+	vkmaDestroyImage(mAllocator, &texture->image, &texture->allocation);
 
 	logt("VkTexture destroyed\n");
 }
@@ -266,8 +239,12 @@ void vktransitionimglayout(VkImage* image, VkBoilerplate* bp, VkCore* core,
 	logt("image layout transiotioned succesfully\n");
 }
 
+/*
 void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 					VkVirtualBuffer* vbuf, uint32_t width, uint32_t height)
+*/
+void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
+					VkbaVirtualBuffer* vBuffer, uint32_t width, uint32_t height)
 {
 	UPDATE_DEBUG_LINE();
 	
@@ -297,7 +274,7 @@ void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	assert(res == VK_SUCCESS);
 
 	VkBufferImageCopy copy = (VkBufferImageCopy) {
-		.bufferOffset = vbuf->offset,
+		.bufferOffset = vBuffer->locale.offset,
 		.bufferRowLength = 0,
 		.bufferImageHeight = 0,
 		.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
@@ -305,7 +282,7 @@ void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.imageExtent = { width, height, 1 }
 	};
 
-	vkCmdCopyBufferToImage(cmdbuf, vbuf->bufferc, texture->image,
+	vkCmdCopyBufferToImage(cmdbuf, vBuffer->buffer, texture->image,
 						   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
 	vkEndCommandBuffer(cmdbuf);
