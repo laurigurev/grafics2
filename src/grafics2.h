@@ -579,6 +579,77 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 
 // ---------------------------------------------------------------------------------
 /*
+  		VULKAN DESCRIPTOR SET MANAGER
+  		vkds_manager.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct VkdsManager_t
+{
+	VkDevice deviceCopy;
+	VkDescriptorPool descPool;
+	Array descSetLayouts;		// VkDescriptorSetLayout
+} VkdsManager;
+
+typedef enum VkdsManagerCreateFlagBits_t
+{
+	VKDS_MANAGER_CREATE_POOL_ALLOW_FREE_BIT = 0x00000001
+} VkdsManagerCreateFlagBits;
+typedef VkFlags VkdsManagerCreateFlags;
+
+typedef struct VkdsManagerCreateInfo_t
+{
+	VkDevice device;
+	u32 poolSize;
+	VkdsManagerCreateFlags flags;
+} VkdsManagerCreateInfo;
+
+typedef enum VkdsBindingType_t
+{
+	VKDS_BINDING_TYPE_IMAGE_SAMPLER = 1
+} VkdsBindingType;
+typedef VkFlags VkdsBindingTypeFlags;
+
+typedef enum VkdsBindingStage_t
+{
+	VKDS_BINDING_STAGE_VERTEX = 1,
+	VKDS_BINDING_STAGE_FRAGMENT = 2
+} VkdsBindingStage;
+typedef VkFlags VkdsBindingStageFlags;
+
+typedef struct VkdsBindingImageSamplerData_t
+{
+	VkSampler sampler;
+	VkImageView view;
+} VkdsBindingImageSamplerData;
+
+typedef union VkdsBindingData_t
+{
+	VkdsBindingImageSamplerData imageSampler;
+} VkdsBindingData;
+
+typedef struct VkdsBinding_t
+{
+	u32 location;
+	VkdsBindingTypeFlags type;
+	VkdsBindingStageFlags stage;
+	VkdsBindingData data;
+} VkdsBinding;
+
+typedef struct VkdsDescriptorSetCreateInfo_t
+{
+	u32 bindingCount;
+	VkdsBinding* bindings;
+	u32 framesInFlight;
+} VkdsDescriptorSetCreateInfo;
+
+VkResult vkdsCreateManager(VkdsManager* manager, VkdsManagerCreateInfo* info);
+VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateInfo* info,
+								 VkDescriptorSet* descriptorSets);
+void vkdsDestroyManager(VkdsManager* manager);
+
+// ---------------------------------------------------------------------------------
+/*
   		vktexture.c
  */
 // ---------------------------------------------------------------------------------
@@ -625,7 +696,7 @@ typedef struct
 } VkDoodad;
 
 void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
-			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool);
+			   VkCore* core, VkBoilerplate* bp, VkdsManager* dsManager);
 void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 			   VkBoilerplate* bp, VkmaAllocator* mAllocator);
 void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame);
@@ -642,7 +713,7 @@ typedef struct
 	VkCore core;
 	VkmaAllocator memory_allocator;
 	VkbaAllocator buffer_allocator;
-	VkDescriptorPool dpool;
+	VkdsManager dsManager;
 	VkDoodad doodad;
 	uint32_t current_frame;
 } VkApp;

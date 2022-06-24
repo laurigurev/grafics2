@@ -20,37 +20,23 @@ void vkappc(VkApp* app, Window* window)
 	VkbaAllocatorCreateInfo bAlloc_info = { &app->memory_allocator, bp->dev, bp->queue };
 	vkbaCreateAllocator(&app->buffer_allocator, &bAlloc_info);
 
-	flushl();
+	// flushl();
 
-	VkDescriptorPoolSize dpool_size = {
-		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = 10
+	VkdsManagerCreateInfo dsManagerInfo = {
+		bp->dev, 10, VKDS_MANAGER_CREATE_POOL_ALLOW_FREE_BIT
 	};
-
-	VkDescriptorPoolCreateInfo dpool_info = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.pNext = NULL,
-		.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-		.maxSets = 10,
-		.poolSizeCount = 1,
-		.pPoolSizes = &dpool_size
-	};
-
-	UPDATE_DEBUG_FILE();
-	UPDATE_DEBUG_LINE();
-	result = vkCreateDescriptorPool(bp->dev, &dpool_info, NULL, &app->dpool);
+	result = vkdsCreateManager(&app->dsManager, &dsManagerInfo);
 	assert(result == VK_SUCCESS);
-	logt("VkDescriptorPool created\n");
 
 	vkdoodadc(&app->doodad, &app->buffer_allocator, &app->memory_allocator,
-			  &app->core, &app->boilerplate, &app->dpool);
+			  &app->core, &app->boilerplate, &app->dsManager);
 	app->current_frame = 0;
 }
 
 void vkappd(VkApp* app)
 {
 	vkDeviceWaitIdle(app->boilerplate.dev);
-	vkDestroyDescriptorPool(app->boilerplate.dev, app->dpool, NULL);
+	vkdsDestroyManager(&app->dsManager);
 	vkdoodadd(&app->doodad, &app->buffer_allocator, &app->boilerplate,
 			  &app->memory_allocator);
 	vkbaDestroyAllocator(&app->buffer_allocator, &app->memory_allocator);

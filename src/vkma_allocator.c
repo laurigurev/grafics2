@@ -419,7 +419,7 @@ VkResult vkmaMapMemory(VkmaAllocator* allocator, VkmaAllocation* allocation, voi
 	}
 	
 	if (result == VK_SUCCESS) {
-		vkma_logi("[vkma] Buffer '%s' mapped succesfully to memory at address %x\n",
+		vkma_logi("[vkma] Buffer '%s' mapped succesfully to memory at address 0x%x\n",
 				  allocation->name, ptr);
 	} else {
 		vkma_logi("[vkma] Failed to map buffer '%s' to memory\n", allocation->name);

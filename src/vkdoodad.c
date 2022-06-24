@@ -4,75 +4,27 @@
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
 void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
-			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
+			   VkCore* core, VkBoilerplate* bp, VkdsManager* dsManager)
 {
 	UPDATE_DEBUG_FILE();
 
 	vktexturec(&doodad->texture, bp, core, mAllocator, bAllocator);
 
-	VkDescriptorSetLayoutBinding dlayout_binding = {
-		.binding = 0,
-		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = 1,
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.pImmutableSamplers = NULL
+	VkdsBindingImageSamplerData imageSampler = {
+		doodad->texture.sampler, doodad->texture.view
 	};
-
-	VkDescriptorSetLayoutCreateInfo dlayout_info = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext = NULL,
-		.flags = 0,
-		.bindingCount = 1,
-		.pBindings = &dlayout_binding
+	VkdsBinding binding = {
+		0, VKDS_BINDING_TYPE_IMAGE_SAMPLER, VKDS_BINDING_STAGE_FRAGMENT, { imageSampler }
 	};
-
-	UPDATE_DEBUG_LINE();
-	VkResult res = vkCreateDescriptorSetLayout(bp->dev, &dlayout_info, NULL,
-												&doodad->dlayout);
+	VkdsDescriptorSetCreateInfo dsInfo = {
+		1, &binding, MAX_FRAMES_IN_FLIGHT
+	};
+	VkResult res = vkdsCreateDescriptorSets(dsManager, &dsInfo, doodad->dsets);
 	assert(res == VK_SUCCESS);
-	logt("VkDescriptorSetLayout created\n");
-	flushl();
-
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		// TODO: find out why descriptorSetCount must be 1
-		
-		VkDescriptorSetAllocateInfo dset_alloc_info = {
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.pNext = NULL,
-			.descriptorPool = *dpool,
-			.descriptorSetCount = 1,
-			.pSetLayouts = &doodad->dlayout
-		};
-
-		UPDATE_DEBUG_LINE();
-		res = vkAllocateDescriptorSets(bp->dev, &dset_alloc_info, doodad->dsets + i);
-		assert(res == VK_SUCCESS);
-		logt("VkDescriptorSet allocated\n");
-		
-		VkDescriptorImageInfo dset_image_info = {
-			.sampler = doodad->texture.sampler,
-			.imageView = doodad->texture.view,
-			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		};
-		
-		VkWriteDescriptorSet dset_write = {
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = NULL,
-			.dstSet = doodad->dsets[i],
-			.dstBinding = 0,
-			.dstArrayElement = 0,
-			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &dset_image_info,
-			.pBufferInfo = NULL,
-			.pTexelBufferView = NULL
-		};
-
-		UPDATE_DEBUG_LINE();
-		vkUpdateDescriptorSets(bp->dev, 1, &dset_write, 0, NULL);
-		logt("VkDescriptorSet updated\n");
-	}
+	// TEMPORARY SOLUTION
+	VkDescriptorSetLayout* tmpDescLayout = arr_get(&dsManager->descSetLayouts,
+												   dsManager->descSetLayouts.size - 1);
+	doodad->dlayout = *tmpDescLayout;
 
 	// -------------------------------------------------------------------
 	
@@ -328,10 +280,6 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 			   VkBoilerplate* bp, VkmaAllocator* mAllocator)
 {
 	UPDATE_DEBUG_FILE();
-
-	UPDATE_DEBUG_LINE();
-	vkDestroyDescriptorSetLayout(bp->dev, doodad->dlayout, NULL);
-	logt("VkDescriptorSetLayout created\n");
 
 	UPDATE_DEBUG_LINE();
 	vkDestroyPipelineLayout(bp->dev, doodad->pipeline_layout, NULL);
