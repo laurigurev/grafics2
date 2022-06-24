@@ -579,125 +579,6 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 
 // ---------------------------------------------------------------------------------
 /*
-  		vkpool.c
- */
-// ---------------------------------------------------------------------------------
-
-typedef struct
-{
-	uint64_t offset;
-	uint64_t size;
-} VkAllocation;
-
-typedef struct
-{
-	uint64_t size;
-	VkDeviceMemory devmem;
-
-	uint32_t alloc_acount;
-	uint32_t alloc_count;
-	VkAllocation* allocs;
-} VkMemoryPool;
-
-void vkmempoolc(VkMemoryPool* pool, VkMemoryAllocateInfo* info, VkBoilerplate* bp);
-void vkmempoold(VkMemoryPool* pool, VkBoilerplate* bp);
-
-// ---------------------------------------------------------------------------------
-/*
-  		vkmemory.c
- */
-// ---------------------------------------------------------------------------------
-
-typedef struct
-{
-	uint64_t size;
-
-	uint32_t pool_acount;
-	uint32_t pool_count;
-	VkMemoryPool* pools;
-} VkHeap;
-
-typedef struct
-{
-	uint32_t heap_count;
-	VkHeap* heaps;
-} VkMemoryAllocator;
-
-typedef struct
-{
-	VkMemoryPropertyFlags property_flags;
-	uint64_t size;
-} VkPoolInfo;
-
-typedef struct
-{
-	uint32_t pool_info_count;
-	VkPoolInfo* pool_infos;
-} VkMemoryAllocatorInfo;
-
-typedef struct
-{
-	VkBuffer* buffer;		// has to be a valid buffer
-	uint64_t size;
-	VkMemoryPropertyFlags property_flags;
-	bool should_map;
-	void* mapped;
-	VkDeviceMemory* devmem;
-} VkBufferInfo;
-
-void vkmemallocc(VkMemoryAllocator* memalloc, VkMemoryAllocatorInfo* info, VkBoilerplate* bp);
-void vkmemallocbuf(VkMemoryAllocator* memalloc, VkBufferInfo* info, VkBoilerplate* bp);
-void vkmemallocimg(VkMemoryAllocator* memalloc, VkBoilerplate* bp, VkImage* image);
-void vkmemallocd(VkMemoryAllocator* memalloc, VkBoilerplate* bp);
-
-// ---------------------------------------------------------------------------------
-/*
-  		vkbufferalloc.c
- */
-// ---------------------------------------------------------------------------------
-
-typedef struct
-{
-	uint64_t size;
-	VkBuffer buffer;
-	VkDeviceMemory* devmem;
-
-	void* ptr;
-	
-	uint32_t suballoc_acount;
-	uint32_t suballoc_count;
-	VkAllocation* suballocs;
-} VkPage;
-
-typedef struct
-{
-	uint32_t page_count;
-	VkPage* pages;
-} VkBufferAllocator;
-
-void vkbufferallocc(
-		VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, VkBoilerplate* bp);
-void vkbufferallocd(VkBufferAllocator* bufalloc, VkBoilerplate* bp);
-
-typedef struct
-{
-	uint32_t page_index;
-	VkBuffer bufferc;
-	uint64_t alloc_size;
-	uint64_t size;
-	uint64_t offset;
-	void* src;
-	void* dst;
-} VkVirtualBuffer;
-
-void vkvbufferalloc(VkVirtualBuffer* vbuffer, VkBufferAllocator* bufalloc,
-					uint32_t page_index, uint64_t size);
-void vkvbufferstage(VkVirtualBuffer* dst, VkBufferAllocator* bufalloc, VkBoilerplate* bp,
-					VkCore* core, uint64_t size, void* src_ptr);
-void vkvbufferret(VkVirtualBuffer* vbuffer, VkBufferAllocator* bufalloc);
-
-// ---------------------------------------------------------------------------------
-/*
   		vktexture.c
  */
 // ---------------------------------------------------------------------------------
@@ -710,21 +591,12 @@ typedef struct
 	VkSampler sampler;
 } VkTexture;
 
-/*
-void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
-				VkMemoryAllocator* memalloc, VkBufferAllocator* bufalloc);
-*/
 void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 				VkmaAllocator* mAllocator, VkbaAllocator* bAllocator);
-// void vktextured(VkTexture* texture, VkBoilerplate* bp);
 void vktextured(VkTexture* texture, VkBoilerplate* bp, VkmaAllocator* mAllocator);
 void vktransitionimglayout(VkImage* image, VkBoilerplate* bp, VkCore* core,
 						  VkFormat format, VkImageLayout old_layout,
 						  VkImageLayout new_layout);
-/*
-void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
-					VkVirtualBuffer* vbuf, uint32_t width, uint32_t height);
-*/
 void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 					VkbaVirtualBuffer* vBuffer, uint32_t width, uint32_t height);
 
@@ -744,8 +616,6 @@ typedef struct
 {
 	VkPipeline pipeline;
 	VkPipelineLayout pipeline_layout;
-	// VkVirtualBuffer vertexbuff;
-	// VkVirtualBuffer indexbuff;
 	VkbaVirtualBuffer vertexbuff;
 	VkbaVirtualBuffer indexbuff;
 	VkTexture texture;
@@ -754,11 +624,6 @@ typedef struct
 	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];
 } VkDoodad;
 
-/*
-void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, 
-			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool);
-void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp);
-*/
 void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
 			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool);
 void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
@@ -775,8 +640,6 @@ typedef struct
 {
 	VkBoilerplate boilerplate;
 	VkCore core;
-	// VkMemoryAllocator memalloc;
-	// VkBufferAllocator buffalloc;
 	VkmaAllocator memory_allocator;
 	VkbaAllocator buffer_allocator;
 	VkDescriptorPool dpool;

@@ -42,10 +42,6 @@ void vkappc(VkApp* app, Window* window)
 	assert(result == VK_SUCCESS);
 	logt("VkDescriptorPool created\n");
 
-	/*
-	vkdoodadc(&app->doodad, &app->buffalloc, &app->memalloc,
-			  &app->core, &app->boilerplate, &app->dpool);
-	*/
 	vkdoodadc(&app->doodad, &app->buffer_allocator, &app->memory_allocator,
 			  &app->core, &app->boilerplate, &app->dpool);
 	app->current_frame = 0;
@@ -55,7 +51,6 @@ void vkappd(VkApp* app)
 {
 	vkDeviceWaitIdle(app->boilerplate.dev);
 	vkDestroyDescriptorPool(app->boilerplate.dev, app->dpool, NULL);
-	// vkdoodadd(&app->doodad, &app->buffalloc, &app->boilerplate);
 	vkdoodadd(&app->doodad, &app->buffer_allocator, &app->boilerplate,
 			  &app->memory_allocator);
 	vkbaDestroyAllocator(&app->buffer_allocator, &app->memory_allocator);
@@ -156,4 +151,3 @@ void vkrender(VkApp* app)
 	app->current_frame++;
 	app->current_frame = app->current_frame % MAX_FRAMES_IN_FLIGHT;
 }
-

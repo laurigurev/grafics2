@@ -3,16 +3,11 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
-/*
-void vkdoodadc(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkMemoryAllocator* memalloc, 
-			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
-*/
 void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
 			   VkCore* core, VkBoilerplate* bp, VkDescriptorPool* dpool)
 {
 	UPDATE_DEBUG_FILE();
 
-	// vktexturec(&doodad->texture, bp, core, memalloc, bufalloc);
 	vktexturec(&doodad->texture, bp, core, mAllocator, bAllocator);
 
 	VkDescriptorSetLayoutBinding dlayout_binding = {
@@ -134,12 +129,10 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 		{ {  0.5f,  0.5f }, { 0.0f, 1.0f } },
 		{ { -0.5f,  0.5f }, { 1.0f, 1.0f } }
 	};
-	// vkvbufferstage(&doodad->vertexbuff, bufalloc, bp, core, sizeof(Vertex) * 4, vertices);
 	VkbaVirtualBufferInfo tmpBufferInfo = { DEVICE_INDEX, sizeof(Vertex) * 4, vertices };
 	vkbaStageVirtualBuffer(bAllocator, &doodad->vertexbuff, &tmpBufferInfo);
 
 	uint32_t indices[6] = { 0, 1, 3, 1, 2, 3 };
-	// vkvbufferstage(&doodad->indexbuff, bufalloc, bp, core, 6*4, indices);
 	tmpBufferInfo = (VkbaVirtualBufferInfo) { DEVICE_INDEX, sizeof(u32) * 6, indices };
 	vkbaStageVirtualBuffer(bAllocator, &doodad->indexbuff, &tmpBufferInfo);
 
@@ -331,7 +324,6 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 	file_free(fragment_shader);
 }
 
-// void vkdoodadd(VkDoodad* doodad, VkBufferAllocator* bufalloc, VkBoilerplate* bp)
 void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 			   VkBoilerplate* bp, VkmaAllocator* mAllocator)
 {
@@ -349,8 +341,6 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 	vkDestroyPipeline(bp->dev, doodad->pipeline, NULL);
 	logt("VkPipeline destroyed\n");
 
-	// vkvbufferret(&doodad->vertexbuff, bufalloc);
-	// vkvbufferret(&doodad->indexbuff, bufalloc);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->vertexbuff);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->indexbuff);
 

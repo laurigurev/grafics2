@@ -3,10 +3,6 @@
 #define UPDATE_DEBUG_LINE() bp->user_data.line = __LINE__ + 1
 #define UPDATE_DEBUG_FILE() bp->user_data.file = __FILE__
 
-/*
-void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
-				VkMemoryAllocator* memalloc, VkBufferAllocator* bufalloc)
-*/
 void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 				VkmaAllocator* mAllocator, VkbaAllocator* bAllocator)
 {
@@ -34,15 +30,6 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
 	};
 
-	/*
-	UPDATE_DEBUG_LINE();
-	VkResult res = vkCreateImage(bp->dev, &image_info, NULL, &texture->image);
-	assert(res == VK_SUCCESS);
-	logt("VkTexture.image created\n");
-
-	vkmemallocimg(memalloc, bp, &texture->image);
-	*/
-
 	VkmaAllocationInfo allocInfo = {
 		VKMA_ALLOCATION_USAGE_DEVICE,
 		0,
@@ -57,18 +44,11 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
 						  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	/*
-	VkVirtualBuffer stage;
-	vkvbufferalloc(&stage, bufalloc, 0, width*height*4);
-	stage.src = pixels;
-	memcpy(stage.dst, stage.src, stage.size);
-	*/
 	VkbaVirtualBuffer stagingBuffer;
 	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height * 4, pixels };
 	result = vkbaCreateVirtualBuffer(bAllocator, &stagingBuffer, &tmpBufferInfo);
 	memcpy(stagingBuffer.dst, stagingBuffer.src, stagingBuffer.locale.size);
 	
-	// vkcopybuftoimg(texture, bp, core, &stage, width, height);
 	vkcopybuftoimg(texture, bp, core, &stagingBuffer, width, height);
 	
 	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
@@ -123,19 +103,16 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	assert(result == VK_SUCCESS);
 	logt("VkTexture.sampler created\n");
 
-	// vkvbufferret(&stage, bufalloc);
 	vkbaDestroyVirtualBuffer(bAllocator, &stagingBuffer);
 	bmp_free(pixels);
 
 	logt("VkTexture created\n");
 }
 
-// void vktextured(VkTexture* texture, VkBoilerplate* bp)
 void vktextured(VkTexture* texture, VkBoilerplate* bp, VkmaAllocator* mAllocator)
 {
 	vkDestroySampler(bp->dev, texture->sampler, NULL);
 	vkDestroyImageView(bp->dev, texture->view, NULL);
-	// vkDestroyImage(bp->dev, texture->image, NULL);
 	vkmaDestroyImage(mAllocator, &texture->image, &texture->allocation);
 
 	logt("VkTexture destroyed\n");
@@ -239,10 +216,6 @@ void vktransitionimglayout(VkImage* image, VkBoilerplate* bp, VkCore* core,
 	logt("image layout transiotioned succesfully\n");
 }
 
-/*
-void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
-					VkVirtualBuffer* vbuf, uint32_t width, uint32_t height)
-*/
 void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 					VkbaVirtualBuffer* vBuffer, uint32_t width, uint32_t height)
 {

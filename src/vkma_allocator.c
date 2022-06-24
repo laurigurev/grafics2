@@ -141,8 +141,8 @@ VkResult vkmaCreateBuffer(VkmaAllocator* allocator,
 						assert(result == VK_SUCCESS);
 					}
 
-					vkma_logi("[vkma] Buffer Allocation '%s' created: heapIndex %hu, \
-			   				   blockIndex %hu, size %lu, offset %lu\n",
+					vkma_logi("[vkma] Buffer Allocation '%s' created: heapIndex %hu, "
+							  "blockIndex %hu, size %lu, offset %lu\n",
 							  allocation->name, allocation->heapIndex, allocation->blockIndex,
 							  allocation->locale.size, allocation->locale.offset);
 					
@@ -215,8 +215,8 @@ VkResult vkmaCreateBuffer(VkmaAllocator* allocator,
 		assert(result == VK_SUCCESS);
 	}
 
-	vkma_logi("[vkma] Buffer Allocation '%s' created: heapIndex %hu, \
-			   blockIndex %hu, size %lu, offset %lu\n",
+	vkma_logi("[vkma] Buffer Allocation '%s' created: heapIndex %hu, "
+			  "blockIndex %hu, size %lu, offset %lu\n",
 			  allocation->name, allocation->heapIndex, allocation->blockIndex,
 			  allocation->locale.size, allocation->locale.offset);
 	
@@ -330,8 +330,8 @@ VkResult vkmaCreateImage(VkmaAllocator* allocator,
 					chunk->size -= imageSize;
 					chunk->offset += imageSize;
 
-					vkma_logi("[vkma] Image allocation '%s' created: heapIndex %hu, \
-			   				   blockIndex %hu, size %lu, offset %lu\n",
+					vkma_logi("[vkma] Image allocation '%s' created: heapIndex %hu, "
+			   				   "blockIndex %hu, size %lu, offset %lu\n",
 							  allocation->name, allocation->heapIndex, allocation->blockIndex,
 							  allocation->locale.size, allocation->locale.offset);
 					
@@ -393,8 +393,8 @@ VkResult vkmaCreateImage(VkmaAllocator* allocator,
 	if (64 <= nameLen) { nameLen = 63; }
 	memcpy(allocation->name, allocInfo->name, nameLen);
 
-	vkma_logi("[vkma] Image allocation '%s' created: heapIndex %hu, \
-			   blockIndex %hu, size %lu, offset %lu\n",
+	vkma_logi("[vkma] Image allocation '%s' created: heapIndex %hu, "
+			  "blockIndex %hu, size %lu, offset %lu\n",
 			  allocation->name, allocation->heapIndex, allocation->blockIndex,
 			  allocation->locale.size, allocation->locale.offset);
 	

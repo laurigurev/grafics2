@@ -121,6 +121,9 @@ VkResult vkbaCreateVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* b
 
 			buffer->src = info->src;
 			buffer->dst = page->ptr + buffer->locale.offset;
+
+			vkba_logi("[vkba] Virtual buffer created, size %hu, offset %hu\n",
+					  buffer->locale.size, buffer->locale.offset);
 			
 			return VK_SUCCESS;
 		}
@@ -165,7 +168,7 @@ VkResult vkbaStageVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* sr
 	// ----------------------------------------------------------------------------
 
 	VkBufferCopy bufferCopy = {
-		srcBuffer->locale.offset, stagingBuffer.locale.offset, info->size
+		stagingBuffer.locale.offset, srcBuffer->locale.offset, info->size
 	};
 	vkCmdCopyBuffer(cmdBuffer, stagingBuffer.buffer, srcBuffer->buffer, 1, &bufferCopy);
 
@@ -212,6 +215,17 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 		}
 		freeSubAlloc++;
 	}
-	vkba_loge("[vkba] Failed to destroy virtual buffer in '%s'\n",
-			  location_names[buffer->pageIndex]);
+
+	VkmaSubAllocation newSubAlloc = { locale.size, locale.offset };
+	arr_add(&page->freeSubAllocs, &newSubAlloc);
+
+	vkba_loge("[vkba] Failed to find close enough freeSubAlloc for '%s'-page, "
+			  "created new with size %hu, offset %hu\n",
+			  location_names[buffer->pageIndex], newSubAlloc.size, newSubAlloc.offset);
+
+	buffer->pageIndex = 0;
+	buffer->buffer = VK_NULL_HANDLE;
+	buffer->locale = (VkmaSubAllocation) { 0, 0 };
+	buffer->src = NULL;
+	buffer->dst = NULL;
 }
