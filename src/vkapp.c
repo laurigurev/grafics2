@@ -118,7 +118,6 @@ void vkrender(VkApp* app)
 
 	UPDATE_DEBUG_LINE();
 	res = vkQueueSubmit(bp->queue, 1, &submit_info, core->in_flight[app->current_frame]);
-	flushl();
 	assert(res == VK_SUCCESS);
 	
 	VkPresentInfoKHR present_info = (VkPresentInfoKHR) {

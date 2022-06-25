@@ -217,9 +217,9 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 	VkmaSubAllocation* freeSubAlloc = (VkmaSubAllocation*) arr_get(&page->freeSubAllocs, 0);
 	VkmaSubAllocation locale = buffer->locale;
 	for (u32 i = 0; i < page->freeSubAllocs.size; i++) {
-		if (locale.offset + locale.size == freeSubAlloc->offset) {
-			freeSubAlloc->size += locale.size;
-			freeSubAlloc->offset -= locale.size;
+		if (locale.offset + buffer->range == freeSubAlloc->offset) {
+			freeSubAlloc->size += buffer->range;
+			freeSubAlloc->offset -= buffer->range;
 
 			buffer->pageIndex = 0;
 			buffer->buffer = VK_NULL_HANDLE;
@@ -236,7 +236,7 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 		freeSubAlloc++;
 	}
 
-	VkmaSubAllocation newSubAlloc = { locale.size, locale.offset };
+	VkmaSubAllocation newSubAlloc = { buffer->range, locale.offset };
 	arr_add(&page->freeSubAllocs, &newSubAlloc);
 
 	vkba_logw("[vkba] Failed to find close enough freeSubAlloc for '%s'-page, "

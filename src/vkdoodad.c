@@ -307,6 +307,8 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->vertexbuff);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->indexbuff);
+	vkbaDestroyVirtualBuffer(bAllocator, &doodad->ubos[0]);
+	vkbaDestroyVirtualBuffer(bAllocator, &doodad->ubos[1]);
 
 	vktextured(&doodad->texture, bp, mAllocator);
 
