@@ -723,6 +723,56 @@ void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame)
 
 // ---------------------------------------------------------------------------------
 /*
+  		VULKAN BINDING PIPELINE MACHINE
+  		vkbp_machine.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct VkbpMachine_t
+{
+	void* pool;
+	u64 totalSize;
+	u64 availableSize;
+} VkbpMachine;
+
+typedef enum VkbpInstruction_t
+{
+	VKBP_INSTRUCTION_BIND_PIPELINE = 0x0001,
+	VKBP_INSTRUCTION_BIND_VERTEX_BUFFER = 0x0002,
+	VKBP_INSTRUCTION_BIND_INDEX_BUFFER = 0x0004,
+	VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS = 0x0008,
+	VKBP_INSTRUCTION_DRAW_INDEXED = 0x0010,
+	VKBP_INSTRUCTION_START_PIPELINE = 0x0020,
+	VKBP_INSTRUCTION_END_PIPELINE = 0x0040
+} VkbpInstruction;
+typedef u16 VkbpInstructionFlag;
+
+typedef struct VkbpBindingPipelineInfo_t
+{
+	/*
+		TODO:
+		 - implementation for other draws
+		 - implementation for multiple vertex buffers
+		 - implementation for instancing buffer
+	 */
+	
+	VkPipeline pipeline;
+	VkbaVirtualBuffer* vertexBuffer;
+	VkbaVirtualBuffer* indexBuffer;
+	VkPipelineLayout pipelineLayout;
+	u32 descriptorSetCount;
+	VkDescriptorSet* descriptorSets;
+	u32 indexCount;
+} VkbpBindingPipelineInfo;
+
+VkResult vkbpCreateMachine(VkbpMachine* machine, u64 size);
+void vkbpDestroyMachine(VkbpMachine* machine);
+void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info);
+VkResult vkbpBindBindingPipelines(VkbpMachine* machine, VkCommandBuffer cmd, u32 frame,
+								  u64 offset);
+
+// ---------------------------------------------------------------------------------
+/*
   		vkapp.c
  */
 // ---------------------------------------------------------------------------------
