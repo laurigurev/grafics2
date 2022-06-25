@@ -45,7 +45,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 						  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	VkbaVirtualBuffer stagingBuffer;
-	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height * 4, pixels };
+	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height * 4, pixels, 0 };
 	result = vkbaCreateVirtualBuffer(bAllocator, &stagingBuffer, &tmpBufferInfo);
 	memcpy(stagingBuffer.dst, stagingBuffer.src, stagingBuffer.locale.size);
 	

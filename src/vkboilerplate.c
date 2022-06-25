@@ -14,11 +14,6 @@ void vkloadextensions(VkBoilerplate* bp)
 		(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(
 			bp->inst, "vkDestroyDebugUtilsMessengerEXT"
 	);
-
-	vkCmdBindVertexBuffers2EXTproxy =
-		(PFN_vkCmdBindVertexBuffers2EXT) vkGetInstanceProcAddr(
-			bp->inst, "vkCmdBindVertexBuffers2EXT"
-	);
 	
 	logi("vulkan extensions loaded\n");
 }
@@ -38,8 +33,12 @@ void vkboilerplatec(VkBoilerplate* bp, Window* win)
 		.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 		.pNext = NULL,
 		.flags = 0,
+		/*
 		.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
 						   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+						   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+		*/
+		.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
 						   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
 		.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
 					   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |

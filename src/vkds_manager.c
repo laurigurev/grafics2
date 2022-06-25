@@ -34,14 +34,17 @@ VkResult vkdsCreateManager(VkdsManager* manager, VkdsManagerCreateInfo* info)
 }
 
 VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateInfo* info,
-								 VkDescriptorSet* descriptorSets)
+								  VkDescriptorSet* descriptorSets,
+								  VkDescriptorSetLayout* outDescSetLayout)
 {
 	assert(manager != NULL);
 	assert(info != NULL);
 	assert(descriptorSets != NULL);
 	VkResult result;
 	
-	VkDescriptorType descTypesLUTs[] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+	VkDescriptorType descTypesLUTs[] = {
+		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+	};
 	VkShaderStageFlags shaderStagesLUTs[] = {
 		VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT
 	};
@@ -54,6 +57,9 @@ VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateI
 		switch (binding->type) {
 			case VKDS_BINDING_TYPE_IMAGE_SAMPLER:
 				descType[i] = descTypesLUTs[0];
+				break;
+			case VKDS_BINDING_TYPE_UNIFORM_BUFFER:
+				descType[i] = descTypesLUTs[1];
 				break;
 			default:
 				vkds_loge("[vkds] in binding %i, type %i not found\n", i, binding->type);
@@ -107,14 +113,13 @@ VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateI
 		VkWriteDescriptorSet descSetWrites[info->bindingCount];
 		Array descriptorImageInfos;
 		arr_init(&descriptorImageInfos, sizeof(VkDescriptorImageInfo));
-		/*
-		  Array descriptorBufferInfos;
-		  arr_init(&descriptorBufferInfos, sizeof(VkDescriptorBufferInfo));
-		*/
+		Array descriptorBufferInfos;
+		arr_init(&descriptorBufferInfos, sizeof(VkDescriptorBufferInfo));
+		
 		for (u32 j = 0; j < info->bindingCount; j++) {
 			descSetWrites[j] = (VkWriteDescriptorSet) {
 				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptorSets[i],
-				binding[j].location, 0, 1, descType[j], NULL, NULL, NULL
+				binding->location, 0, 1, descType[j], NULL, NULL, NULL
 			};
 
 			if (descType[j] == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
@@ -126,16 +131,29 @@ VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateI
 				arr_add(&descriptorImageInfos, &tmpDescriptorImageInfo);
 				descSetWrites[j].pImageInfo = arr_get(&descriptorImageInfos,
 													  descriptorImageInfos.size - 1);
-			} else {
-				assert(false);
-			} /* else if (descType[i] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) { */
+			} else if (descType[j] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+				VkdsBindingUniformData tmpUniformBuffer = binding->data.uniformBuffer;
+				VkDescriptorBufferInfo tmpDescriptorBufferInfo = {
+					tmpUniformBuffer.vbuffers[i].buffer,
+					tmpUniformBuffer.vbuffers[i].locale.offset,
+					tmpUniformBuffer.vbuffers[i].range
+				};
+				arr_add(&descriptorBufferInfos, &tmpDescriptorBufferInfo);
+				descSetWrites[j].pBufferInfo = arr_get(&descriptorBufferInfos,
+													  descriptorBufferInfos.size - 1);
+			}
+			else {
+				return VK_ERROR_UNKNOWN;
+			}
 			binding++;
 		}
 		vkUpdateDescriptorSets(manager->deviceCopy, info->bindingCount, descSetWrites,
 							   0, VK_NULL_HANDLE);
 		arr_free(&descriptorImageInfos);
+		arr_free(&descriptorBufferInfos);
 	}
-	
+
+	*outDescSetLayout = tmpDescSetLayout;
 	arr_add(&manager->descSetLayouts, &tmpDescSetLayout);
 	vkds_logi("[vkds] %hu Descriptor sets created\n", info->framesInFlight);
 	return result;

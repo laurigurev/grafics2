@@ -10,21 +10,37 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 
 	vktexturec(&doodad->texture, bp, core, mAllocator, bAllocator);
 
-	VkdsBindingImageSamplerData imageSampler = {
+	doodad->uboData[0] = -0.5f;
+	doodad->uboData[1] = -0.5f;
+	doodad->uboData[2] = 0.0f;
+	VkbaVirtualBufferInfo vBufferInfo = { HOST_INDEX, 3 * 4, doodad->uboData, 1 };
+	VkResult res = vkbaCreateVirtualBuffer(bAllocator, doodad->ubos + 0, &vBufferInfo);
+	assert(res == VK_SUCCESS);
+	res = vkbaCreateVirtualBuffer(bAllocator, doodad->ubos + 1, &vBufferInfo);
+	assert(res == VK_SUCCESS);
+	memcpy(doodad->ubos[0].dst, doodad->ubos[0].src, doodad->ubos[0].locale.size);
+	memcpy(doodad->ubos[1].dst, doodad->ubos[1].src, doodad->ubos[1].locale.size);
+
+	VkdsBindingData bindingData0;
+	bindingData0.imageSampler = (VkdsBindingImageSamplerData) {
 		doodad->texture.sampler, doodad->texture.view
 	};
-	VkdsBinding binding = {
-		0, VKDS_BINDING_TYPE_IMAGE_SAMPLER, VKDS_BINDING_STAGE_FRAGMENT, { imageSampler }
+	VkdsBindingData bindingData1;
+	bindingData1.uniformBuffer = (VkdsBindingUniformData) { doodad->ubos };
+	VkdsBinding bindings[] = {
+		(VkdsBinding) {
+			0, VKDS_BINDING_TYPE_IMAGE_SAMPLER, VKDS_BINDING_STAGE_FRAGMENT, bindingData0
+		},
+		(VkdsBinding) {
+		   1, VKDS_BINDING_TYPE_UNIFORM_BUFFER, VKDS_BINDING_STAGE_VERTEX, bindingData1
+		}
 	};
 	VkdsDescriptorSetCreateInfo dsInfo = {
-		1, &binding, MAX_FRAMES_IN_FLIGHT
+		2, bindings, MAX_FRAMES_IN_FLIGHT
 	};
-	VkResult res = vkdsCreateDescriptorSets(dsManager, &dsInfo, doodad->dsets);
+	res = vkdsCreateDescriptorSets(dsManager, &dsInfo, doodad->dsets,
+								   &doodad->dlayout);
 	assert(res == VK_SUCCESS);
-	// TEMPORARY SOLUTION
-	VkDescriptorSetLayout* tmpDescLayout = arr_get(&dsManager->descSetLayouts,
-												   dsManager->descSetLayouts.size - 1);
-	doodad->dlayout = *tmpDescLayout;
 
 	// -------------------------------------------------------------------
 	
@@ -300,10 +316,8 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame)
 {
 	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
-	vkCmdBindVertexBuffers2EXTproxy(cmdbuf, 0, 1, &doodad->vertexbuff.buffer,
-									&doodad->vertexbuff.locale.offset,
-									&doodad->vertexbuff.locale.size,
-									NULL);
+	vkCmdBindVertexBuffers(cmdbuf, 0, 1, &doodad->vertexbuff.buffer,
+						   &doodad->vertexbuff.locale.offset);
 	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.buffer,
 						 doodad->indexbuff.locale.offset, 
 						 VK_INDEX_TYPE_UINT32);

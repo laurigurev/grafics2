@@ -379,7 +379,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vkDebugCallback
 
 PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXTproxy;
 PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXTproxy;
-PFN_vkCmdBindVertexBuffers2EXT vkCmdBindVertexBuffers2EXTproxy;
 
 typedef struct
 {
@@ -541,6 +540,7 @@ typedef struct VkbaPage_t
 typedef struct VkbaAllocator_t
 {
 	VkbaPage* pages; 		// first is HOST, second is DEVICE
+	u64 uniformBufferOffsetAlignment;
 	VkDevice device;
 	VkQueue queue;
 	VkCommandPool commandPool;
@@ -549,6 +549,7 @@ typedef struct VkbaAllocator_t
 typedef struct VkbaAllocatorCreateInfo_t
 {
 	VkmaAllocator* allocator;
+	VkPhysicalDevice physicalDevice;
 	VkDevice device;
 	VkQueue queue;
 } VkbaAllocatorCreateInfo;
@@ -558,15 +559,23 @@ typedef struct VkbaVirtualBuffer_t
 	u32 pageIndex;
 	VkBuffer buffer;
 	VkmaSubAllocation locale;
+	u64 range;
 	void* src;
 	void* dst;
 } VkbaVirtualBuffer;
+
+typedef enum VkbaVirtualBufferType_t
+{
+	VKBA_VIRTUAL_BUFFER_TYPE_UNIFORM = 1
+	// VKBA_VIRTUAL_BUFFER_TYPE_STORAGE = 2
+} VkbaVirtualBufferType;
 
 typedef struct VkbaVirtualBufferInfo_t
 {
 	u32 index;
 	u64 size;
 	void* src;
+	VkbaVirtualBufferType type;
 } VkbaVirtualBufferInfo;
 
 void vkbaCreateAllocator(VkbaAllocator* bAllocator, VkbaAllocatorCreateInfo* info);
@@ -606,7 +615,8 @@ typedef struct VkdsManagerCreateInfo_t
 
 typedef enum VkdsBindingType_t
 {
-	VKDS_BINDING_TYPE_IMAGE_SAMPLER = 1
+	VKDS_BINDING_TYPE_IMAGE_SAMPLER = 1,
+	VKDS_BINDING_TYPE_UNIFORM_BUFFER = 2
 } VkdsBindingType;
 typedef VkFlags VkdsBindingTypeFlags;
 
@@ -623,9 +633,15 @@ typedef struct VkdsBindingImageSamplerData_t
 	VkImageView view;
 } VkdsBindingImageSamplerData;
 
+typedef struct VkdsBindingUniformData_t
+{
+	VkbaVirtualBuffer* vbuffers;
+} VkdsBindingUniformData;
+
 typedef union VkdsBindingData_t
 {
 	VkdsBindingImageSamplerData imageSampler;
+	VkdsBindingUniformData uniformBuffer;
 } VkdsBindingData;
 
 typedef struct VkdsBinding_t
@@ -645,7 +661,8 @@ typedef struct VkdsDescriptorSetCreateInfo_t
 
 VkResult vkdsCreateManager(VkdsManager* manager, VkdsManagerCreateInfo* info);
 VkResult vkdsCreateDescriptorSets(VkdsManager* manager, VkdsDescriptorSetCreateInfo* info,
-								 VkDescriptorSet* descriptorSets);
+								  VkDescriptorSet* descriptorSets,
+								  VkDescriptorSetLayout* outDescSetLayout);
 void vkdsDestroyManager(VkdsManager* manager);
 
 // ---------------------------------------------------------------------------------
@@ -689,7 +706,10 @@ typedef struct
 	VkPipelineLayout pipeline_layout;
 	VkbaVirtualBuffer vertexbuff;
 	VkbaVirtualBuffer indexbuff;
+	
 	VkTexture texture;
+	float uboData[3];
+	VkbaVirtualBuffer ubos[MAX_FRAMES_IN_FLIGHT];
 
 	VkDescriptorSetLayout dlayout;
 	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];

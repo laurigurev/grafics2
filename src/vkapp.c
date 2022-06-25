@@ -17,7 +17,9 @@ void vkappc(VkApp* app, Window* window)
 	result = vkmaCreateAllocator(&app->memory_allocator, &alloc_info);
 	assert(result == VK_SUCCESS);
 
-	VkbaAllocatorCreateInfo bAlloc_info = { &app->memory_allocator, bp->dev, bp->queue };
+	VkbaAllocatorCreateInfo bAlloc_info = {
+		&app->memory_allocator, bp->phydev, bp->dev, bp->queue
+	};
 	vkbaCreateAllocator(&app->buffer_allocator, &bAlloc_info);
 
 	// flushl();
@@ -116,6 +118,7 @@ void vkrender(VkApp* app)
 
 	UPDATE_DEBUG_LINE();
 	res = vkQueueSubmit(bp->queue, 1, &submit_info, core->in_flight[app->current_frame]);
+	flushl();
 	assert(res == VK_SUCCESS);
 	
 	VkPresentInfoKHR present_info = (VkPresentInfoKHR) {

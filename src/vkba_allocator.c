@@ -70,6 +70,11 @@ void vkbaCreateAllocator(VkbaAllocator* bAllocator, VkbaAllocatorCreateInfo* inf
 	arr_add(&bAllocator->pages[DEVICE_INDEX].freeSubAllocs,
 			&bAllocator->pages[DEVICE_INDEX].allocation.locale);
 
+	VkPhysicalDeviceProperties physicalDeviceProperties;
+	vkGetPhysicalDeviceProperties(info->physicalDevice, &physicalDeviceProperties);
+	VkPhysicalDeviceLimits pDeviceLimits = physicalDeviceProperties.limits;
+	bAllocator->uniformBufferOffsetAlignment = pDeviceLimits.minUniformBufferOffsetAlignment;
+
 	bAllocator->device = info->device;
 	bAllocator->queue = info->queue;
 
@@ -89,6 +94,8 @@ void vkbaDestroyAllocator(VkbaAllocator* bAllocator, VkmaAllocator* allocator)
 	vkDestroyCommandPool(bAllocator->device, bAllocator->commandPool, NULL);
 	bAllocator->queue = VK_NULL_HANDLE;
 	bAllocator->device = VK_NULL_HANDLE;
+
+	bAllocator->uniformBufferOffsetAlignment = 0;
 	
 	VkbaPage* page = bAllocator->pages + HOST_INDEX;
 	vkmaDestroyBuffer(allocator, &page->buffer, &page->allocation);
@@ -110,20 +117,30 @@ VkResult vkbaCreateVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* b
 {
 	VkbaPage* page = bAllocator->pages + info->index;
 	VkmaSubAllocation* freeSubAlloc = (VkmaSubAllocation*) arr_get(&page->freeSubAllocs, 0);
+
+	u64 alignment = 0;
+	switch (info->type) {
+		case VKBA_VIRTUAL_BUFFER_TYPE_UNIFORM:
+			alignment = info->size % bAllocator->uniformBufferOffsetAlignment;
+			alignment = bAllocator->uniformBufferOffsetAlignment - alignment;
+			break;
+	}
+	
 	for (u32 i = 0; i < page->freeSubAllocs.size; i++) {
 		if (info->size <= freeSubAlloc->size) {
 			buffer->pageIndex = info->index;
 			buffer->buffer = page->buffer;
 			buffer->locale = (VkmaSubAllocation) { info->size, freeSubAlloc->offset };
+			buffer->range = info->size + alignment;
 
-			freeSubAlloc->size -= info->size;
-			freeSubAlloc->offset += info->size;
+			freeSubAlloc->size -= buffer->range;
+			freeSubAlloc->offset += buffer->range;
 
 			buffer->src = info->src;
 			buffer->dst = page->ptr + buffer->locale.offset;
 
-			vkba_logi("[vkba] Virtual buffer created, size %hu, offset %hu\n",
-					  buffer->locale.size, buffer->locale.offset);
+			vkba_logi("[vkba] Virtual buffer created, size %hu, offset %hu, range %hu\n",
+					  buffer->locale.size, buffer->locale.offset, buffer->range);
 			
 			return VK_SUCCESS;
 		}
@@ -140,11 +157,11 @@ VkResult vkbaStageVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* sr
 	VkResult result;
 	
 	VkbaVirtualBuffer stagingBuffer;
-	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, info->size, info->src };
+	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, info->size, info->src, 0 };
 	vkbaCreateVirtualBuffer(bAllocator, &stagingBuffer, &tmpBufferInfo);
 	memcpy(stagingBuffer.dst, stagingBuffer.src, stagingBuffer.locale.size);
 	tmpBufferInfo = (VkbaVirtualBufferInfo) {
-		info->index /* DEVICE_INDEX */, info->size, stagingBuffer.dst
+		info->index /* DEVICE_INDEX */, info->size, stagingBuffer.dst, 0
 	};
 	vkbaCreateVirtualBuffer(bAllocator, srcBuffer, &tmpBufferInfo);
 
@@ -207,9 +224,12 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 			buffer->pageIndex = 0;
 			buffer->buffer = VK_NULL_HANDLE;
 			buffer->locale = (VkmaSubAllocation) { 0, 0 };
+			buffer->range = 0;
 
 			buffer->src = NULL;
 			buffer->dst = NULL;
+
+			vkba_logi("[vkba] Virtual buffer destroyed\n");
 			
 			return;
 		}
@@ -219,7 +239,7 @@ void vkbaDestroyVirtualBuffer(VkbaAllocator* bAllocator, VkbaVirtualBuffer* buff
 	VkmaSubAllocation newSubAlloc = { locale.size, locale.offset };
 	arr_add(&page->freeSubAllocs, &newSubAlloc);
 
-	vkba_loge("[vkba] Failed to find close enough freeSubAlloc for '%s'-page, "
+	vkba_logw("[vkba] Failed to find close enough freeSubAlloc for '%s'-page, "
 			  "created new with size %hu, offset %hu\n",
 			  location_names[buffer->pageIndex], newSubAlloc.size, newSubAlloc.offset);
 
