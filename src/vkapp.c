@@ -30,8 +30,18 @@ void vkappc(VkApp* app, Window* window)
 	result = vkdsCreateManager(&app->dsManager, &dsManagerInfo);
 	assert(result == VK_SUCCESS);
 
+	result = vkbpCreateMachine(&app->machine, KILOBYTE);
+	assert(result == VK_SUCCESS);
+
 	vkdoodadc(&app->doodad, &app->buffer_allocator, &app->memory_allocator,
 			  &app->core, &app->boilerplate, &app->dsManager);
+
+	VkbpBindingPipelineInfo bInfo = {
+		app->doodad.pipeline, &app->doodad.vertexbuff, &app->doodad.indexbuff,
+		app->doodad.pipeline_layout, 2, 1, app->doodad.dsets, 6
+	};
+    app->doodad.bindingId = vkbpAddBindingPipeline(&app->machine, &bInfo);
+
 	app->current_frame = 0;
 }
 
@@ -96,9 +106,10 @@ void vkrender(VkApp* app)
 	};
 	
 	vkCmdBeginRenderPass(cmdbuf, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-	// vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
-	// vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	vkdoodadb(doodad, cmdbuf, app->current_frame);
+	res = vkbpBindBindingPipeline(&app->machine, cmdbuf, app->current_frame,
+								  doodad->bindingId);
+	assert(res == VK_SUCCESS);
+	
 	vkCmdEndRenderPass(cmdbuf);
 	UPDATE_DEBUG_LINE();
 	assert(vkEndCommandBuffer(cmdbuf) == VK_SUCCESS);
@@ -135,7 +146,7 @@ void vkrender(VkApp* app)
     res = vkQueuePresentKHR(bp->queue, &present_info);
 	// assert(res == VK_SUCCESS);
 	// vkQueuePresentKHR(renderer->queue, &present_info);
-	
+
 	app->current_frame++;
 	app->current_frame = app->current_frame % MAX_FRAMES_IN_FLIGHT;
 }

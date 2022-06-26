@@ -690,39 +690,6 @@ void vkcopybuftoimg(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 
 // ---------------------------------------------------------------------------------
 /*
-  		vkdoodad.c
- */
-// ---------------------------------------------------------------------------------
-
-typedef struct
-{
-	float position[2];
-	float uv[2];
-} Vertex;
-
-typedef struct
-{
-	VkPipeline pipeline;
-	VkPipelineLayout pipeline_layout;
-	VkbaVirtualBuffer vertexbuff;
-	VkbaVirtualBuffer indexbuff;
-	
-	VkTexture texture;
-	float uboData[3];
-	VkbaVirtualBuffer ubos[MAX_FRAMES_IN_FLIGHT];
-
-	VkDescriptorSetLayout dlayout;
-	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];
-} VkDoodad;
-
-void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
-			   VkCore* core, VkBoilerplate* bp, VkdsManager* dsManager);
-void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
-			   VkBoilerplate* bp, VkmaAllocator* mAllocator);
-void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame);
-
-// ---------------------------------------------------------------------------------
-/*
   		VULKAN BINDING PIPELINE MACHINE
   		vkbp_machine.c
  */
@@ -737,15 +704,15 @@ typedef struct VkbpMachine_t
 
 typedef enum VkbpInstruction_t
 {
-	VKBP_INSTRUCTION_BIND_PIPELINE = 0x0001,
-	VKBP_INSTRUCTION_BIND_VERTEX_BUFFER = 0x0002,
-	VKBP_INSTRUCTION_BIND_INDEX_BUFFER = 0x0004,
-	VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS = 0x0008,
-	VKBP_INSTRUCTION_DRAW_INDEXED = 0x0010,
-	VKBP_INSTRUCTION_START_PIPELINE = 0x0020,
-	VKBP_INSTRUCTION_END_PIPELINE = 0x0040
+	VKBP_INSTRUCTION_BIND_PIPELINE = 0x00000001,
+	VKBP_INSTRUCTION_BIND_VERTEX_BUFFER = 0x00000002,
+	VKBP_INSTRUCTION_BIND_INDEX_BUFFER = 0x00000004,
+	VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS = 0x00000008,
+	VKBP_INSTRUCTION_DRAW_INDEXED = 0x00000010,
+	VKBP_INSTRUCTION_START_PIPELINE = 0x00000020,
+	VKBP_INSTRUCTION_END_PIPELINE = 0x00000040
 } VkbpInstruction;
-typedef u16 VkbpInstructionFlag;
+typedef u32 VkbpInstructionFlag;
 
 typedef struct VkbpBindingPipelineInfo_t
 {
@@ -760,6 +727,7 @@ typedef struct VkbpBindingPipelineInfo_t
 	VkbaVirtualBuffer* vertexBuffer;
 	VkbaVirtualBuffer* indexBuffer;
 	VkPipelineLayout pipelineLayout;
+	u32 maxFramesInFlight;
 	u32 descriptorSetCount;
 	VkDescriptorSet* descriptorSets;
 	u32 indexCount;
@@ -767,9 +735,44 @@ typedef struct VkbpBindingPipelineInfo_t
 
 VkResult vkbpCreateMachine(VkbpMachine* machine, u64 size);
 void vkbpDestroyMachine(VkbpMachine* machine);
-void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info);
-VkResult vkbpBindBindingPipelines(VkbpMachine* machine, VkCommandBuffer cmd, u32 frame,
+u64 vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info);
+VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 frame,
 								  u64 offset);
+
+// ---------------------------------------------------------------------------------
+/*
+  		vkdoodad.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct
+{
+	float position[2];
+	float uv[2];
+} Vertex;
+
+typedef struct
+{
+	u64 bindingId;
+	VkPipeline pipeline;
+	VkPipelineLayout pipeline_layout;
+	VkbaVirtualBuffer vertexbuff;
+	VkbaVirtualBuffer indexbuff;
+	
+	VkTexture texture;
+	float uboData[3];
+	VkbaVirtualBuffer ubos[MAX_FRAMES_IN_FLIGHT];
+
+	VkDescriptorSetLayout dlayout;
+	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];
+
+	// u64 bindingId;		// NOTE: this has to be here, otherwise app crashes
+} VkDoodad;
+
+void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
+			   VkCore* core, VkBoilerplate* bp, VkdsManager* dsManager);
+void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
+			   VkBoilerplate* bp, VkmaAllocator* mAllocator);
 
 // ---------------------------------------------------------------------------------
 /*
@@ -784,6 +787,7 @@ typedef struct
 	VkmaAllocator memory_allocator;
 	VkbaAllocator buffer_allocator;
 	VkdsManager dsManager;
+	VkbpMachine machine;
 	VkDoodad doodad;
 	uint32_t current_frame;
 } VkApp;

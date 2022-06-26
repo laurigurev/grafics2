@@ -315,16 +315,3 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 	logt("VkDoodad destroyed\n");
 }
 
-void vkdoodadb(VkDoodad* doodad, VkCommandBuffer cmdbuf, uint32_t current_frame)
-{
-	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, doodad->pipeline);
-	vkCmdBindVertexBuffers(cmdbuf, 0, 1, &doodad->vertexbuff.buffer,
-						   &doodad->vertexbuff.locale.offset);
-	vkCmdBindIndexBuffer(cmdbuf, doodad->indexbuff.buffer,
-						 doodad->indexbuff.locale.offset, 
-						 VK_INDEX_TYPE_UINT32);
-	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
-							doodad->pipeline_layout, 0, 1,
-							&doodad->dsets[current_frame], 0, NULL);
-	vkCmdDrawIndexed(cmdbuf, 6, 1, 0, 0, 0);
-}

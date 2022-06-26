@@ -20,7 +20,7 @@ void vkbpDestroyMachine(VkbpMachine* machine)
 	machine->availableSize = 0;
 }
 
-void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info)
+u64 vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info)
 {
 	// TODO: realloc
 
@@ -37,9 +37,9 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 	u32* cmdCount;
 
 	{
-		short* tmp = ptr + size;
+		VkbpInstructionFlag* tmp = ptr + size;
 		*tmp = VKBP_INSTRUCTION_START_PIPELINE;
-		size += 2;
+		size += 4;
 
 		cmdCount = ptr + size;
 		*cmdCount = 0;
@@ -47,16 +47,16 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 	}
 	
 	if (info->pipeline == VK_NULL_HANDLE) {
-		short* instr = ptr + size;
+		VkbpInstructionFlag* instr = ptr + size;
 		*instr = VKBP_INSTRUCTION_END_PIPELINE;
-		size += 2;
+		size += 4;
 		*cmdCount += 1;
 		machine->availableSize -= size;
-		return ptr;
+		return offset;
 	} else {
-		short* instr = ptr + size;
+		VkbpInstructionFlag* instr = ptr + size;
 		*instr = VKBP_INSTRUCTION_BIND_PIPELINE;
-		size += 2;
+		size += 4;
 		
 		VkPipeline* tmp = ptr + size;
 		*tmp = info->pipeline;
@@ -66,27 +66,12 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 	}
 
 	if (info->vertexBuffer) {
-		short* instr = ptr + size;
+		VkbpInstructionFlag* instr = ptr + size;
 		*instr = VKBP_INSTRUCTION_BIND_VERTEX_BUFFER;
-		size += 2;
-		
-		VkBuffer** tmp0 = ptr + size;
-		*tmp0 = &info->vertexBuffer->buffer;
-		size += sizeof(VkBuffer*);
-		u64** tmp1 = ptr + size;
-		*tmp1 = &info->vertexBuffer->locale.offset;
-		size += sizeof(u64*);
-
-		*cmdCount += 1;
-	}
-
-	if (info->indexBuffer) {
-		short* instr = ptr + size;
-		*instr = VKBP_INSTRUCTION_BIND_INDEX_BUFFER;
-		size += 2;
+		size += 4;
 		
 		VkBuffer* tmp0 = ptr + size;
-		*tmp0 = info->indexBuffer->buffer;
+		*tmp0 = info->vertexBuffer->buffer;
 		size += sizeof(VkBuffer);
 		u64* tmp1 = ptr + size;
 		*tmp1 = info->vertexBuffer->locale.offset;
@@ -95,22 +80,41 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 		*cmdCount += 1;
 	}
 
+	if (info->indexBuffer) {
+		VkbpInstructionFlag* instr = ptr + size;
+		*instr = VKBP_INSTRUCTION_BIND_INDEX_BUFFER;
+		size += 4;
+		
+		VkBuffer* tmp0 = ptr + size;
+		*tmp0 = info->indexBuffer->buffer;
+		size += sizeof(VkBuffer);
+		u64* tmp1 = ptr + size;
+		*tmp1 = info->indexBuffer->locale.offset;
+		size += sizeof(u64);
+
+		*cmdCount += 1;
+	}
+
 	if (info->pipelineLayout != VK_NULL_HANDLE) {
-		short* instr = ptr + size;
+		VkbpInstructionFlag* instr = ptr + size;
 		*instr = VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS;
-		size += 2;
+		size += 4;
 
 		VkPipelineLayout* tmp0 = ptr + size;
 		*tmp0 = info->pipelineLayout;
 		size += sizeof(VkPipelineLayout);
 
 		u32* tmp1 = ptr + size;
-		*tmp1 = info->descriptorSetCount;
+		*tmp1 = info->maxFramesInFlight;
+		size += sizeof(u32);
+		
+		u32* tmp2 = ptr + size;
+		*tmp2 = info->descriptorSetCount;
 		size += sizeof(u32);
 
-		VkDescriptorSet* tmp2 = ptr + size;
-		memcpy(tmp2, info->descriptorSets, sizeof(VkDescriptorSet) * (*tmp1));
-		size += sizeof(VkDescriptorSet) * (*tmp1);
+		VkDescriptorSet* tmp3 = ptr + size;
+		memcpy(tmp3, info->descriptorSets, sizeof(VkDescriptorSet) * (*tmp2) * (*tmp1));
+		size += sizeof(VkDescriptorSet) * (*tmp2) * (*tmp1);
 
 		/*
 		  	NOTE:
@@ -127,9 +131,9 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 
 	{
 		assert(0 < info->indexCount);
-		short* instr0 = ptr + size;
+		VkbpInstructionFlag* instr0 = ptr + size;
 		*instr0 = VKBP_INSTRUCTION_DRAW_INDEXED;
-		size += 2;
+		size += 4;
 
 		u32* tmp0 = ptr + size;
 		*tmp0 = info->indexCount;
@@ -137,15 +141,15 @@ void* vkbpAddBindingPipeline(VkbpMachine* machine, VkbpBindingPipelineInfo* info
 
 		*cmdCount += 1;
 
-		short* instr1 = ptr + size;
+		VkbpInstructionFlag* instr1 = ptr + size;
 		*instr1 = VKBP_INSTRUCTION_END_PIPELINE;
-		size += 2;
+		size += 4;
 
 		*cmdCount += 1;
 	}
 	
 	machine->availableSize -= size;
-	return ptr;
+	return offset;
 }
 
 VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 frame,
@@ -154,8 +158,8 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 	void* ptr = machine->pool + offset;
 	u64 localOffset = 0;
 	VkbpInstructionFlag* start = ptr + localOffset;
-	localOffset += sizeof(VkbpInstruction);
-	if (*start & VKBP_INSTRUCTION_START_PIPELINE) {
+	localOffset += sizeof(VkbpInstructionFlag);
+	if (!(*start & VKBP_INSTRUCTION_START_PIPELINE)) {
 		// TODO: log an error
 		return VK_ERROR_UNKNOWN;
 	}
@@ -164,7 +168,7 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 	localOffset += sizeof(u32);
 	for (u32 i = 0; i < *cmdCount; i++) {
 		VkbpInstructionFlag* instruction = ptr + localOffset;
-		localOffset += sizeof(VkbpInstruction);
+		localOffset += sizeof(VkbpInstructionFlag);
 
 		/*
 		  	TODO:
@@ -179,15 +183,17 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 				VkPipeline* tmp0 = ptr + localOffset;
 				localOffset += sizeof(VkPipeline);
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *tmp0);
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_BIND_PIPELINE\n");
 				break;
 			}
 			case VKBP_INSTRUCTION_BIND_VERTEX_BUFFER:
 			{
-				VkBuffer** tmp0 = ptr + localOffset;
-				localOffset += sizeof(VkBuffer*);
-				u64** tmp1 = ptr + localOffset;
-				localOffset += sizeof(u64*);
-				vkCmdBindVertexBuffers(cmd, 0, 1, *tmp0, *tmp1);
+				VkBuffer* tmp0 = ptr + localOffset;
+				localOffset += sizeof(VkBuffer);
+				u64* tmp1 = ptr + localOffset;
+				localOffset += sizeof(u64);
+				vkCmdBindVertexBuffers(cmd, 0, 1, tmp0, tmp1);
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_BIND_VERTEX_BUFFER\n");
 				break;
 			}
 			case VKBP_INSTRUCTION_BIND_INDEX_BUFFER:
@@ -197,6 +203,7 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 				u64* tmp1 = ptr + localOffset;
 				localOffset += sizeof(u64);
 				vkCmdBindIndexBuffer(cmd, *tmp0, *tmp1, VK_INDEX_TYPE_UINT32);
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_BIND_INDEX_BUFFER\n");
 				break;
 			}
 			case VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS:
@@ -207,11 +214,13 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 				localOffset += sizeof(VkPipelineLayout);
 				u32* tmp1 = (u32*) (ptr + localOffset);
 				localOffset += sizeof(u32);
-				VkDescriptorSet* tmp2 = ptr + localOffset;
-				localOffset += sizeof(VkDescriptorSet) * (*tmp1);
-				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *tmp0, 0, *tmp1,
-										tmp2 + *tmp1 * sizeof(VkDescriptorSet) * frame,
-										0, NULL);
+				u32* tmp2 = (u32*) (ptr + localOffset);
+				localOffset += sizeof(u32);
+				VkDescriptorSet* tmp3 = ptr + localOffset;
+				localOffset += sizeof(VkDescriptorSet) * (*tmp1) * (*tmp2);
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *tmp0, 0,
+										*tmp2, tmp3 + frame * (*tmp2), 0, NULL);
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS\n");
 				break;
 			}
 			case VKBP_INSTRUCTION_DRAW_INDEXED:
@@ -219,16 +228,18 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 				u32* tmp0 = ptr + localOffset;
 				localOffset += sizeof(u32);
 				vkCmdDrawIndexed(cmd, *tmp0, 1, 0, 0, 0);
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_DRAW_INDEXED\n");
 				break;
 			}
 			case VKBP_INSTRUCTION_END_PIPELINE:
 			{
+				// vkbp_logi("[vkbp] VKBP_INSTRUCTION_END_PIPELINE\n");
 				return VK_SUCCESS;
 			}
 			default:
 			{
 				vkbp_loge("[vkbp] unsupported instruction - 0x%x type, number %i, "
-						  "Binding Pipeline  %lu\n", *instruction, i, (u64) offset);
+						  "Binding Pipeline %lu\n", *instruction, i, offset);
 				return VK_ERROR_UNKNOWN;
 			}
 		}
