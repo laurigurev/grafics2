@@ -38,6 +38,7 @@ typedef short 				i16;
 typedef unsigned short 		u16;
 typedef char	 			i8;
 typedef unsigned char 		u8;
+typedef float				s32;
 
 // ---------------------------------------------------------------------------------
 /*
@@ -130,6 +131,58 @@ void file_free(void* buffer);
 
 char* bmp_load(const char* file, uint32_t* width, uint32_t* height);
 void bmp_free(char* buffer);
+
+// ---------------------------------------------------------------------------------
+/*
+  		ttf.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct TrueTypeFontTable_t
+{
+	u32 offset;
+	u32 length;
+} TrueTypeFontTable;
+
+typedef struct TrueTypeFontGlyph_t
+{
+	i16 parsed;
+	i16 num_contours;
+	i16 x_min;
+	i16 y_min;
+	i16 x_max;
+	i16 y_max;
+	u16* end_pts_of_contours;
+	u16 num_points;
+	u8* flags;
+	i16* pts_x;
+	i16* pts_y;
+} TrueTypeFontGlyph;
+
+typedef struct TrueTypeFont_t
+{
+	u16 units_per_em;
+	i16 x_min;
+	i16 y_min;
+	i16 x_max;
+	i16 y_max;
+	u16 lowest_rec_ppem;
+	u16 num_glyphs;
+	u16 seg_count_2;
+	u16* end_code;
+	u16* start_code;
+	u16* id_delta;
+	u16* id_range_offset;
+	u32* loca;
+	TrueTypeFontGlyph* glyphs;
+} TrueTypeFont;
+
+int ttf_load2(TrueTypeFont* ttf, const char* font_path);
+void ttf_free2(TrueTypeFont* ttf);
+// u32 ttf_glyph_index_get();
+void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
+					u64* ttf_buffer_tail_offset);
+// void ttf_glyph_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph* dst);
 
 // ---------------------------------------------------------------------------------
 /*
