@@ -37,8 +37,8 @@ void vkappc(VkApp* app, Window* window)
 			  &app->core, &app->boilerplate, &app->dsManager);
 
 	VkbpBindingPipelineInfo bInfo = {
-		app->doodad.pipeline, &app->doodad.vertexbuff, &app->doodad.indexbuff,
-		app->doodad.pipeline_layout, 2, 1, app->doodad.dsets, 6
+		app->doodad.pipeline.pipe, &app->doodad.vertexbuff, &app->doodad.indexbuff,
+		app->doodad.pipeline.layout, 2, 1, app->doodad.dsets, 6
 	};
     app->doodad.bindingId = vkbpAddBindingPipeline(&app->machine, &bInfo);
 

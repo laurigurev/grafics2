@@ -741,6 +741,43 @@ VkResult vkbpBindBindingPipeline(VkbpMachine* machine, VkCommandBuffer cmd, u32 
 
 // ---------------------------------------------------------------------------------
 /*
+  		VULKAN ENHANCED PIPELINE
+  		vken_pipeline.c
+ */
+// ---------------------------------------------------------------------------------
+
+typedef struct VkenPipeline_t
+{
+	VkDevice device_copy;
+	VkPipeline pipe;
+	VkPipelineLayout layout;
+} VkenPipeline;
+
+typedef struct VkenPipelineCreateInfo_t
+{
+	char* vertex_shader_path;
+	char* fragment_shader_path;
+	u32 vertex_input_binding_description_count;
+	VkVertexInputBindingDescription* vertex_input_binding_descriptions;
+	u32 vertex_input_attribute_description_count;
+	VkVertexInputAttributeDescription* vertex_input_attribute_descriptions;
+	u32 descriptor_set_layout_count;
+	VkDescriptorSetLayout* layouts;
+	VkExtent2D extent;
+	VkDevice device;
+	VkRenderPass renderpass;
+	u32 subpass_index;
+} VkenPipelineCreateInfo;
+
+typedef struct VkenPipelineCache_t VkenPipelineCache;
+
+// void vkenInitializeCache();
+VkResult vkenCreatePipelines(u32 pipeline_count, VkenPipeline* pipelines,
+							 VkenPipelineCreateInfo* infos);
+void vkenDestroyPipeline(VkenPipeline* pipeline);
+
+// ---------------------------------------------------------------------------------
+/*
   		vkdoodad.c
  */
 // ---------------------------------------------------------------------------------
@@ -754,8 +791,7 @@ typedef struct
 typedef struct
 {
 	u64 bindingId;
-	VkPipeline pipeline;
-	VkPipelineLayout pipeline_layout;
+	VkenPipeline pipeline;
 	VkbaVirtualBuffer vertexbuff;
 	VkbaVirtualBuffer indexbuff;
 	
