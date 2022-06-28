@@ -5,12 +5,14 @@ int main()
 	log_init("grafics2.log");
 	logi("hello, vulkan!\n");
 
-	// ttf_core ttf;
-	// ttf_load(&ttf);
-	// char* bmp = (char*) ttf_to_bmp(64, 64, &ttf);
-	// ttf_free(&ttf);
-	// free(bmp);
-	
+	/*
+	TrueTypeFont* ttf = NULL;
+	i32 result = ttf_load2(&ttf, "resources/calibri.ttf");
+	assert(result == 1);
+	ttf_free2(&ttf);
+	logi("[main] ttf loaded and freed\n");
+	*/
+
 	Window win;
 	windowc(&win, "grafics2.exe", 750, 750);
 

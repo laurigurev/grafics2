@@ -9,8 +9,19 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	UPDATE_DEBUG_FILE();
 	VkResult result;
 
+	/*
 	uint32_t width, height;
 	void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
+	*/
+	
+	TrueTypeFont* ttf = NULL;
+	i32 ttf_result = ttf_load2(&ttf, "resources/calibri.ttf");
+	assert(ttf_result == 1);
+	
+	u32 width = 128;
+	u32 height = width;
+	void* pixels = (void*) ttf_create_bitmap(ttf, 'A', width, height);
+	ttf_free2(&ttf);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,

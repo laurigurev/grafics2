@@ -177,12 +177,21 @@ typedef struct TrueTypeFont_t
 	TrueTypeFontGlyph* glyphs;
 } TrueTypeFont;
 
-int ttf_load2(TrueTypeFont* ttf, const char* font_path);
-void ttf_free2(TrueTypeFont* ttf);
-// u32 ttf_glyph_index_get();
+typedef struct TTFVector_t
+{
+	u32 x;
+	u32 y;
+	u8 flag;
+} TTFVector;
+
+int ttf_load2(TrueTypeFont** true_type_font, const char* font_path);
+void ttf_free2(TrueTypeFont** true_type_font);
 void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 					u64* ttf_buffer_tail_offset);
-// void ttf_glyph_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph* dst);
+void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph** dst);
+i32 ttf_glyph_index_get2(TrueTypeFont* ttf, u16 code_point);
+void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height);
+void ttf_linear_interpolation(TTFVector* vec0, TTFVector* vec1, pixel* bmp, u32 width);
 
 // ---------------------------------------------------------------------------------
 /*
