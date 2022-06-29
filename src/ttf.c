@@ -607,20 +607,32 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	arr_init(&points, sizeof(TTFVector));
 	arr_init(&contours, U32_SIZE);
 
+	/*
+		TODO:
+		 - create array of lines, not points, because with points
+		   you will have to separate contours, and that takes time.
+	*/
 	u32 x, y, jj = 0;
 	arr_add(&contours, &jj);
 	float mx, my;
+	// for (u16 i = 8; i < glyph->end_pts_of_contours[2] + 1; i++) {
 	for (u16 i = 0; i < glyph->num_points; i++) {
+	// for (u16 i = 0; i < glyph->end_pts_of_contours[1] + 1; i++) {
 		x = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
 		y = height - ((scale * glyph->pts_y[i]) + abs(scale * glyph->y_min));
 		TTFVector tmp_point0 = { x, y, glyph->flags[i] };
-		arr_add(&points, &tmp_point0);
+		// arr_add(&points, &tmp_point0);
+		if (glyph->flags[i] & 0x01) {
+			logd("[ttf -> index %i] x %i, y %i\n", points.size, x, y);
+			arr_add(&points, &tmp_point0);
+		}
 		if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
 			mx = (float) (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
 			my = (float) (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
 			x = width - ((scale * mx) + abs(scale * glyph->x_min));
 			y = height - ((scale * my) + abs(scale * glyph->y_min));
 			TTFVector tmp_point1 = { x, y, 0x01 };
+			logd("[ttf -> index %i] x %i, y %i\n", points.size, x, y);
 			arr_add(&points, &tmp_point1);
 		}
 		for (u32 j = jj; j < glyph->num_contours; j++) {
@@ -628,67 +640,58 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 		}
 	}
 
-	// size = 74
-	u32 i0, i1, ii1, ii2;
-	for (u32 ii = 0; ii < contours.size - 1; ii++) {
-		i0 = *((u32*) arr_get(&contours, ii));
-		i1 = *((u32*) arr_get(&contours, ii + 1));
-		for (u32 i = i0; i < i1; i++) {
-			TTFVector* vec0 = (TTFVector*) arr_get(&points, i);
-			ii1 = i + 1;
-			if (i1 <= ii1) { ii1 %= i1; ii1 += i0; }
-			TTFVector* vec1 = (TTFVector*) arr_get(&points, ii1);
-			ii2 = i + 2;
-			if (i1 <= ii2) { ii2 %= i1; ii2 += i0; }
-			TTFVector* vec2 = (TTFVector*) arr_get(&points, ii2);
-			if (!(vec0->flag & 0x01)) {
-				continue;
-			} else if (vec1->flag & 0x01) {
-				ttf_linear_interpolation(vec0, vec1, bmp, width);
-			} else {
-				ttf_linear_interpolation(vec0, vec2, bmp, width);
+	s32 dx, dy;
+	u32 intersection, x0, x1, smaller_y, bigger_y, i0, i1;
+	// TODO: change intersections into floats
+	Array intersections;
+	arr_init(&intersections, sizeof(u32));
+	for (u32 i = 0; i < height; i++) {
+		for (u32 l = 0; l < contours.size - 1; l++) {
+			i0 = *((u32*) arr_get(&contours, l));
+			i1 = *((u32*) arr_get(&contours, l + 1));
+			for (u32 j = i0; j < i1; j++) {
+				// NOTE: this is line equation, point-slope format
+				TTFVector* vec0 = (TTFVector*) arr_get(&points, j);
+				jj = j + 1;
+				if (i1 <= jj) { jj %= i1; jj += i0; }
+				TTFVector* vec1 = (TTFVector*) arr_get(&points, jj);
+
+				smaller_y = MIN(vec0->y, vec1->y);
+				bigger_y = MAX(vec0->y, vec1->y);
+				if (i <= smaller_y) continue;
+				if (i > bigger_y) continue;
+
+				dx = (s32) vec1->x - vec0->x;
+				dy = (s32) vec1->y - vec0->y;
+				if (dy == 0) continue;
+
+				if (dx == 0) {
+					intersection = vec0->x;
+				} else {
+					intersection = ((s32) i - vec0->y) * (dx / dy) + vec0->x;
+				}
+				logd("[ttf - scanline %i, line %i] intersection done\n", i, j);
+				arr_add(&intersections, &intersection);
 			}
 		}
-	}
 
+		// TODO: implement qsort version
+		bubble_sortui(intersections.data, intersections.size);
+		logd("[ttf - scanline %i] intersections.size %i\n", i, intersections.size);
+		
+		for (u32 k = 0; k < intersections.size; k += 2) {
+			x0 = *((u32*) arr_get(&intersections, k));
+			x1 = *((u32*) arr_get(&intersections, k + 1));
+			for (u32 m = x0; m < x1; m++) {
+				bmp[m + i * width] = (pixel) { 0xff, 0xff, 0xff, 0xff };
+			}
+		}
+		arr_clean(&intersections);
+	}
+	arr_free(&intersections);
 	arr_free(&points);
 	arr_free(&contours);
 	return bmp;
-}
-
-void ttf_linear_interpolation(TTFVector* vec0, TTFVector* vec1, pixel* bmp, u32 width)
-{	
-	u32 x0,x1,y0,y1,tmp,x,y;
-	bool steep = false;
-	float t;
-	x0 = vec0->x; x1 = vec1->x, y0 = vec0->y; y1 = vec1->y;
-	if (abs(x0 - x1) < abs(y0 - y1)) {
-		tmp = x0;
-		x0 = y0;
-		y0 = tmp;
-		tmp = x1;
-		x1 = y1;
-		y1 = tmp;
-		steep = true;
-	}
-	
-	if (x1 < x0) {
-		tmp = x0;
-		x0 = x1;
-		x1 = tmp;
-		tmp = y0;
-		y0 = y1;
-		y1 = tmp;
-	}
-
-	for (x = x0; x <= x1; x++) {
-		t = (x - x0) / (float) (x1 - x0);
-		y = y0 * (1.0f - t) + y1 * t;
-		if (y0 == y1) {
-			y = y0; };
-		if (steep) { bmp[y + x * width] = (pixel) { 0xff, 0x00, 0x00, 0xff }; }
-		else { bmp[x + y * width] = (pixel) { 0x00, 0xff, 0x00, 0xff }; }
-	}
 }
 
 s32 f2fot14_to_float_2(u16 f2dot14) {

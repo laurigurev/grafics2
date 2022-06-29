@@ -40,6 +40,15 @@ typedef char	 			i8;
 typedef unsigned char 		u8;
 typedef float				s32;
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
+typedef struct vec2f_t
+{
+	s32 x;
+	s32 y;
+} vec2f;
+
 // ---------------------------------------------------------------------------------
 /*
   		sort.c
@@ -191,7 +200,6 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph** dst);
 i32 ttf_glyph_index_get2(TrueTypeFont* ttf, u16 code_point);
 void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height);
-void ttf_linear_interpolation(TTFVector* vec0, TTFVector* vec1, pixel* bmp, u32 width);
 
 // ---------------------------------------------------------------------------------
 /*
