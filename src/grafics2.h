@@ -174,6 +174,7 @@ typedef struct TrueTypeFontGlyph_t
 	u8* flags;
 	i16* pts_x;
 	i16* pts_y;
+	// TODO: add 'advance width'
 } TrueTypeFontGlyph;
 
 typedef struct TrueTypeFont_t
@@ -184,6 +185,8 @@ typedef struct TrueTypeFont_t
 	i16 x_max;
 	i16 y_max;
 	u16 lowest_rec_ppem;
+	i16 ascent;
+	i16 descent;
 	u16 num_glyphs;
 	u16 seg_count_2;
 	u16* end_code;

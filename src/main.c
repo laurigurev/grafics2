@@ -5,11 +5,11 @@ int main()
 	log_init("grafics2.log");
 	logi("hello, vulkan!\n");
 
+	/*
 	TrueTypeFont* ttf = NULL;
 	i32 result = ttf_load2(&ttf, "resources/calibri.ttf");
 	assert(result == 1);
 
-	/*
 	int iters = 10000;
 	int time;
 	time_t before = clock();
@@ -35,10 +35,10 @@ int main()
 	difference = clock() - before;
 	time = difference * 1000 / CLOCKS_PER_SEC;
 	logd("[ttf_create_bitmap2] time %i, iterations %i\n", time, iters);
-	*/
 	
 	ttf_free2(&ttf);
 	logi("[main] ttf loaded and freed\n");
+	*/
 
 	Window win;
 	windowc(&win, "grafics2.exe", 750, 750);

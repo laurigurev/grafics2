@@ -16,6 +16,7 @@
 #define TTF_CMAP_TAG 0x636d6170
 #define TTF_LOCA_TAG 0x6c6f6361
 #define TTF_GLYF_TAG 0x676c7966
+#define TTF_HHEA_TAG 0x68686561
 
 #define TTF_WIN_PLATFORM_ID 3
 #define TTF_FLAG_REPEAT 0x08
@@ -37,7 +38,8 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		(TrueTypeFontTable) { 0, 0 },	// maxp
 		(TrueTypeFontTable) { 0, 0 },	// cmap
 		(TrueTypeFontTable) { 0, 0 },	// loca
-		(TrueTypeFontTable) { 0, 0 }	// glyf
+		(TrueTypeFontTable) { 0, 0 },	// glyf
+		(TrueTypeFontTable) { 0, 0 }	// hhea
 	};
 	u32 tables_found = 0;
 	for (u16 i = 0; i < num_tables; i++) {
@@ -49,6 +51,10 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		switch (tag) {
 		case TTF_HEAD_TAG:
 			tables[0] = (TrueTypeFontTable) { table_offset, table_length };
+			tables_found++;
+			break;
+		case TTF_HHEA_TAG:
+			tables[5] = (TrueTypeFontTable) { table_offset, table_length };
 			tables_found++;
 			break;
 		case TTF_MAXP_TAG:
@@ -71,7 +77,7 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		offset += table_size;
 	}
 
-	if (tables_found != 5) { return -1; }
+	if (tables_found != 6) { return -1; }
 
 	// calculate allocation size
 	/*
@@ -156,6 +162,14 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 	}
 
 	if (index_to_loc_format == -1) { return -1; }
+
+	{
+		// hhea
+		u64 hhea_offset = tables[5].offset + U32_SIZE;
+		ttf->ascent = ENDIAN_WORD(*((i16*) (buffer + hhea_offset)));
+		hhea_offset += U16_SIZE;
+		ttf->descent = ENDIAN_WORD(*((i16*) (buffer + hhea_offset)));
+	}
 
 	{
 		// maxp
@@ -265,7 +279,7 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 	u32 glyph_offset = ttf->loca[glyph_index];
 	TrueTypeFontGlyph* glyph = ttf->glyphs + glyph_index;
 
-	if (glyph->parsed == 1) { return; }
+	if (glyph->parsed == 1) return;
 
 	glyph->parsed = 1;
 	glyph->num_contours = ENDIAN_WORD(*((i16*) (buffer + glyph_offset)));
@@ -500,7 +514,7 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 			TrueTypeFontGlyph* component = *((TrueTypeFontGlyph**) arr_get(&glyphs, i));
 
 			for (i16 j = 0; j < component->num_contours; j++) {
-				component->end_pts_of_contours[j] += prev_num_contours;
+				component->end_pts_of_contours[j] += prev_num_points;
 			}
 			memcpy(glyph->end_pts_of_contours + prev_num_contours,
 				   component->end_pts_of_contours,
@@ -600,9 +614,11 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	pixel* bmp = (pixel*) malloc(width * height * sizeof(pixel));
 	memset(bmp, 0, width * height * sizeof(pixel));
 
-	// i32 glyph_index = ttf_glyph_index_get2(ttf, c);
-	TrueTypeFontGlyph* glyph = ttf->glyphs + 0;
-	float scale = (float) height / (float) ttf->units_per_em;
+	i32 glyph_index = ttf_glyph_index_get2(ttf, c);
+	TrueTypeFontGlyph* glyph = ttf->glyphs + glyph_index;
+	s32 scale = (float) height / (float) ttf->units_per_em;
+	s32 descent = scale * ttf->descent;
+	s32 hor_mid = width / 4.0f;	// TODO: LEFT side bearing
 
 	Array lines, points;
 	arr_init(&lines, sizeof(line2f));
@@ -613,17 +629,19 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	u32 max_y = 0;
 	u32 contour_counter = 0;
 	for (u16 i = 0; i < glyph->num_points; i++) {
-		x0 = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
-		y0 = height - ((scale * glyph->pts_y[i]) + abs(scale * glyph->y_min));
-		if (y0 < min_y) { min_y = y0; }
-		if (max_y < y0) { max_y = y0; }
+		// x0 = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
+		x0 = width - ((scale * glyph->pts_x[i]) + hor_mid);
+		y0 = height - ((scale * glyph->pts_y[i]) - descent);
+		if (y0 < min_y) min_y = y0;
+		if (max_y < y0) max_y = y0;
 		vec2f tmp_point0 = { x0, y0 };
 		if (glyph->flags[i] &0x01) { arr_add(&points, &tmp_point0); }
 		else if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
 			mx = (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
 			my = (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
-			x0 = width - ((scale * mx) + abs(scale * glyph->x_min));
-			y0 = height - ((scale * my) + abs(scale * glyph->y_min));
+			// x0 = width - ((scale * mx) + abs(scale * glyph->x_min));
+			x0 = width - ((scale * mx) + hor_mid);
+			y0 = height - ((scale * my) - descent);
 			vec2f tmp_point1 = { x0, y0 };
 			arr_add(&points, &tmp_point1);
 		}
@@ -634,6 +652,8 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 				vec2f* point0 = (vec2f*) arr_get(&points, j);
 				vec2f* point1 = (vec2f*) arr_get(&points, j + 1);
 				line2f line = { *point0, *point1 };
+				logd("[ttf] line : { %f, %f }, { %f, %f }\n",
+					 point0->x, point0->y, point1->x, point1->y);
 				arr_add(&lines, &line);
 			}
 			arr_clean(&points);
