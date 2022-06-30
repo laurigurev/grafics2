@@ -17,6 +17,7 @@
 #define TTF_LOCA_TAG 0x6c6f6361
 #define TTF_GLYF_TAG 0x676c7966
 #define TTF_HHEA_TAG 0x68686561
+#define TTF_HMTX_TAG 0x686d7478
 
 #define TTF_WIN_PLATFORM_ID 3
 #define TTF_FLAG_REPEAT 0x08
@@ -39,7 +40,8 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		(TrueTypeFontTable) { 0, 0 },	// cmap
 		(TrueTypeFontTable) { 0, 0 },	// loca
 		(TrueTypeFontTable) { 0, 0 },	// glyf
-		(TrueTypeFontTable) { 0, 0 }	// hhea
+		(TrueTypeFontTable) { 0, 0 },	// hhea
+		(TrueTypeFontTable) { 0, 0 }	// hmtx
 	};
 	u32 tables_found = 0;
 	for (u16 i = 0; i < num_tables; i++) {
@@ -51,10 +53,6 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		switch (tag) {
 		case TTF_HEAD_TAG:
 			tables[0] = (TrueTypeFontTable) { table_offset, table_length };
-			tables_found++;
-			break;
-		case TTF_HHEA_TAG:
-			tables[5] = (TrueTypeFontTable) { table_offset, table_length };
 			tables_found++;
 			break;
 		case TTF_MAXP_TAG:
@@ -73,11 +71,19 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 			tables[4] = (TrueTypeFontTable) { table_offset, table_length };
 			tables_found++;
 			break;
+		case TTF_HHEA_TAG:
+			tables[5] = (TrueTypeFontTable) { table_offset, table_length };
+			tables_found++;
+			break;
+		case TTF_HMTX_TAG:
+			tables[6] = (TrueTypeFontTable) { table_offset, table_length };
+			tables_found++;
+			break;
 		}
 		offset += table_size;
 	}
 
-	if (tables_found != 6) { return -1; }
+	if (tables_found != 7) { return -1; }
 
 	// calculate allocation size
 	/*
@@ -169,6 +175,34 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 		ttf->ascent = ENDIAN_WORD(*((i16*) (buffer + hhea_offset)));
 		hhea_offset += U16_SIZE;
 		ttf->descent = ENDIAN_WORD(*((i16*) (buffer + hhea_offset)));
+		hhea_offset += 14 * U16_SIZE;
+		ttf->num_hmtx = ENDIAN_WORD(*((u16*) (buffer + hhea_offset)));
+	}
+
+	{
+		// hmtx
+		u64 hmtx_offset = tables[6].offset;
+		ttf->hmtx = ((void*) ttf) + alloc_tail_offset;
+		memcpy(ttf->hmtx, buffer + hmtx_offset, ttf->num_hmtx * sizeof(TrueTypeFontMetric));
+		alloc_tail_offset += ttf->num_hmtx * sizeof(TrueTypeFontMetric);
+		hmtx_offset += ttf->num_hmtx * sizeof(TrueTypeFontMetric);
+		
+		ttf->num_lsb = tmp_num_glyphs - ttf->num_hmtx;
+		ttf->lsbs = NULL;
+		if (ttf->num_lsb != 0) {
+			ttf->lsbs = ((void*) ttf) + alloc_tail_offset;
+			memcpy(ttf->lsbs, buffer + hmtx_offset, ttf->num_lsb * U16_SIZE);
+			alloc_tail_offset += ttf->num_lsb * U16_SIZE;
+		}
+
+		for (u16 i = 0; i < ttf->num_hmtx; i++) {
+			ttf->hmtx[i].aw = ENDIAN_WORD(ttf->hmtx[i].aw);
+			ttf->hmtx[i].lsb = ENDIAN_WORD(ttf->hmtx[i].lsb);
+		}
+
+		for (u16 i = 0; i < ttf->num_lsb; i++) {
+			ttf->lsbs[i] = ENDIAN_WORD(ttf->lsbs[i]);
+		}
 	}
 
 	{
@@ -400,6 +434,9 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 				}
 			}
 		}
+
+		// set hmtx
+		ttf_glyph_get_hmtc(ttf, glyph, glyph_index);
 	} else if (glyph->num_contours < 0) {
 		// compound glyph
 
@@ -407,6 +444,7 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 		u16 flags, tmp_glyph_index, x, y, f2dot14;
 		i16 total_num_contours = 0;
 		i16 total_num_points = 0;
+		i32 set_hmtc = 0;
 		Array glyphs;
 		arr_init(&glyphs, sizeof(TrueTypeFontGlyph*));
 
@@ -492,6 +530,11 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 						                  component->pts_x[i] * transform_10;
 				}
 			}
+
+			if (flags & 0x0200) {
+				set_hmtc = 1;
+				ttf_glyph_get_hmtc(ttf, glyph, glyph_index);
+			}
 		} while (flags & 0x0020);
 
 		// update num_contours
@@ -531,9 +574,23 @@ void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 			free(component);
 		}
 		arr_free(&glyphs);
+
+		if (set_hmtc) return;
+		ttf_glyph_get_hmtc(ttf, glyph, glyph_index);
 	} else if (glyph->num_contours == 0) {
 		return;
 	}
+}
+
+void ttf_glyph_get_hmtc(TrueTypeFont* ttf, TrueTypeFontGlyph* glyph, u32 glyph_index)
+{
+	if (glyph_index < ttf->num_hmtx) {
+		glyph->aw = ttf->hmtx[glyph_index].aw;
+		glyph->lsb = ttf->hmtx[glyph_index].lsb;
+		return;
+	}
+	glyph->aw = ttf->hmtx[ttf->num_hmtx - 1].aw;
+	glyph->lsb = ttf->lsbs[glyph_index - ttf->num_hmtx];
 }
 
 void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph** dst)
@@ -578,6 +635,9 @@ void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGl
 	(*dst)->pts_y = (i16*) (tmp_dst + glyph_tail_offset);
 	glyph_tail_offset += src_glyph->num_points * U16_SIZE;
 	memcpy((*dst)->pts_y, src_glyph->pts_y, src_glyph->num_points * U16_SIZE);
+
+	(*dst)->aw = src_glyph->aw;
+	(*dst)->lsb = src_glyph->lsb;
 }
 
 i32 ttf_glyph_index_get2(TrueTypeFont* ttf, u16 code_point)
@@ -616,9 +676,12 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 
 	i32 glyph_index = ttf_glyph_index_get2(ttf, c);
 	TrueTypeFontGlyph* glyph = ttf->glyphs + glyph_index;
-	s32 scale = (float) height / (float) ttf->units_per_em;
-	s32 descent = scale * ttf->descent;
-	s32 hor_mid = width / 4.0f;	// TODO: LEFT side bearing
+	i16 bbox = MAX(ttf->x_max - ttf->x_min, ttf->y_max - ttf->y_min);
+	// s32 scale = (float) height / (float) ttf->units_per_em;
+	s32 scale = (float) height / (float) bbox;
+	// s32 descent = scale * ttf->descent;
+	s32 descent = scale * ttf->x_min;
+	s32 lsb = (width / 2.0f) + 0.5f * scale * glyph->aw;
 
 	Array lines, points;
 	arr_init(&lines, sizeof(line2f));
@@ -629,9 +692,8 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	u32 max_y = 0;
 	u32 contour_counter = 0;
 	for (u16 i = 0; i < glyph->num_points; i++) {
-		// x0 = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
-		x0 = width - ((scale * glyph->pts_x[i]) + hor_mid);
-		y0 = height - ((scale * glyph->pts_y[i]) - descent);
+		x0 = width - (scale * glyph->pts_x[i]) + lsb;
+		y0 = height - (scale * glyph->pts_y[i]) + descent;
 		if (y0 < min_y) min_y = y0;
 		if (max_y < y0) max_y = y0;
 		vec2f tmp_point0 = { x0, y0 };
@@ -639,9 +701,8 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 		else if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
 			mx = (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
 			my = (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
-			// x0 = width - ((scale * mx) + abs(scale * glyph->x_min));
-			x0 = width - ((scale * mx) + hor_mid);
-			y0 = height - ((scale * my) - descent);
+			x0 = width - (scale * mx) + lsb;
+			y0 = height - (scale * my) + descent;
 			vec2f tmp_point1 = { x0, y0 };
 			arr_add(&points, &tmp_point1);
 		}
@@ -652,8 +713,10 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 				vec2f* point0 = (vec2f*) arr_get(&points, j);
 				vec2f* point1 = (vec2f*) arr_get(&points, j + 1);
 				line2f line = { *point0, *point1 };
+				/*
 				logd("[ttf] line : { %f, %f }, { %f, %f }\n",
 					 point0->x, point0->y, point1->x, point1->y);
+				*/
 				arr_add(&lines, &line);
 			}
 			arr_clean(&points);

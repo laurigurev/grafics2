@@ -174,8 +174,15 @@ typedef struct TrueTypeFontGlyph_t
 	u8* flags;
 	i16* pts_x;
 	i16* pts_y;
-	// TODO: add 'advance width'
+	u16 aw;
+	i16 lsb;
 } TrueTypeFontGlyph;
+
+typedef struct TrueTypeFontMetric_t
+{
+	u16 aw;
+	i16 lsb;
+} TrueTypeFontMetric;
 
 typedef struct TrueTypeFont_t
 {
@@ -187,6 +194,10 @@ typedef struct TrueTypeFont_t
 	u16 lowest_rec_ppem;
 	i16 ascent;
 	i16 descent;
+	u16 num_hmtx;
+	TrueTypeFontMetric* hmtx;
+	u16 num_lsb;
+	i16* lsbs;
 	u16 num_glyphs;
 	u16 seg_count_2;
 	u16* end_code;
@@ -208,6 +219,7 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path);
 void ttf_free2(TrueTypeFont** true_type_font);
 void ttf_glyph_load(TrueTypeFont* ttf, u32 glyph_index, void* buffer,
 					u64* ttf_buffer_tail_offset);
+void ttf_glyph_get_hmtc(TrueTypeFont* ttf, TrueTypeFontGlyph* glyph, u32 glyph_index);
 void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph** dst);
 i32 ttf_glyph_index_get2(TrueTypeFont* ttf, u16 code_point);
 void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height);
