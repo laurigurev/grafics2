@@ -24,7 +24,7 @@
 
 s32 f2fot14_to_float_2(u16 f2dot14);
 
-int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
+int ttf_load(TrueTypeFont** true_type_font, const char* font_path)
 {
 	u32 buffer_size;
 	char* buffer = file_read(font_path, &buffer_size);
@@ -301,7 +301,7 @@ int ttf_load2(TrueTypeFont** true_type_font, const char* font_path)
 	return 1;
 }
 
-void ttf_free2(TrueTypeFont** true_type_font)
+void ttf_free(TrueTypeFont** true_type_font)
 {
 	TrueTypeFont* ttf = *true_type_font;
 	if (ttf) { free(ttf); }
@@ -640,7 +640,7 @@ void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGl
 	(*dst)->lsb = src_glyph->lsb;
 }
 
-i32 ttf_glyph_index_get2(TrueTypeFont* ttf, u16 code_point)
+i32 ttf_glyph_index_get(TrueTypeFont* ttf, u16 code_point)
 {
 	assert(ttf != NULL);
 	
@@ -674,7 +674,7 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	pixel* bmp = (pixel*) malloc(width * height * sizeof(pixel));
 	memset(bmp, 0, width * height * sizeof(pixel));
 
-	i32 glyph_index = ttf_glyph_index_get2(ttf, c);
+	i32 glyph_index = ttf_glyph_index_get(ttf, c);
 	TrueTypeFontGlyph* glyph = ttf->glyphs + glyph_index;
 	i16 bbox = MAX(ttf->x_max - ttf->x_min, ttf->y_max - ttf->y_min);
 	// s32 scale = (float) height / (float) ttf->units_per_em;

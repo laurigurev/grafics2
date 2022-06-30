@@ -15,13 +15,13 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	*/
 	
 	TrueTypeFont* ttf = NULL;
-	i32 ttf_result = ttf_load2(&ttf, "resources/calibri.ttf");
+	i32 ttf_result = ttf_load(&ttf, "resources/calibri.ttf");
 	assert(ttf_result == 1);
 	
 	u32 width = 128;
 	u32 height = width;
 	void* pixels = (void*) ttf_create_bitmap(ttf, 'a', width, height);
-	ttf_free2(&ttf);
+	ttf_free(&ttf);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
