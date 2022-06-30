@@ -6,6 +6,7 @@ vulkan_lib := -LC:/VulkanSDK/1.3.204.1/Lib -lvulkan-1
 win32_lib := -lgdi32 -luser32 -lkernel32 -lcomctl32 -lm -mwindows
 libs := $(vulkan_lib) $(win32_lib)
 flags := -g -Wall -O0 -DVK_USE_PLATFORM_WIN32_KHR
+# flags := -O3 -DVK_USE_PLATFORM_WIN32_KHR
 obj := obj/main.o obj/logger.o obj/vkboilerplate.o obj/vkdebug.o obj/win32.o obj/vkcore.o obj/fileio.o obj/vkdoodad.o obj/bmploader.o obj/vktexture.o obj/vkapp.o obj/ttfparser.o obj/array.o obj/sort.o obj/utils.o obj/vkma_allocator.o obj/vkba_allocator.o obj/vkds_manager.o obj/vkbp_machine.o obj/vken_pipeline.o obj/ttf.o
 
 
@@ -81,4 +82,4 @@ obj/ttf.o: src/ttf.c
 	$(cc) $(vulkan_inc) $(flags) -c $? -o $@
 
 $(exe): $(obj)
-	$(cc) $(obj) -o $@ $(libs)
+	$(cc) $(flags) $(obj) -o $@ $(libs)

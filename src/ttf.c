@@ -603,94 +603,78 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	// i32 glyph_index = ttf_glyph_index_get2(ttf, c);
 	TrueTypeFontGlyph* glyph = ttf->glyphs + 0;
 	float scale = (float) height / (float) ttf->units_per_em;
-	Array points, contours;
-	arr_init(&points, sizeof(TTFVector));
-	arr_init(&contours, U32_SIZE);
 
-	/*
-		TODO:
-		 - create array of lines, not points, because with points
-		   you will have to separate contours, and that takes time.
-	*/
-	u32 x, y, jj = 0;
-	arr_add(&contours, &jj);
-	float mx, my;
-	// for (u16 i = 8; i < glyph->end_pts_of_contours[2] + 1; i++) {
+	Array lines, points;
+	arr_init(&lines, sizeof(line2f));
+	arr_init(&points, sizeof(vec2f));
+	
+	s32 x0, y0, mx, my;
+	u32 min_y = height;
+	u32 max_y = 0;
+	u32 contour_counter = 0;
 	for (u16 i = 0; i < glyph->num_points; i++) {
-	// for (u16 i = 0; i < glyph->end_pts_of_contours[1] + 1; i++) {
-		x = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
-		y = height - ((scale * glyph->pts_y[i]) + abs(scale * glyph->y_min));
-		TTFVector tmp_point0 = { x, y, glyph->flags[i] };
-		// arr_add(&points, &tmp_point0);
-		if (glyph->flags[i] & 0x01) {
-			logd("[ttf -> index %i] x %i, y %i\n", points.size, x, y);
-			arr_add(&points, &tmp_point0);
-		}
-		if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
-			mx = (float) (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
-			my = (float) (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
-			x = width - ((scale * mx) + abs(scale * glyph->x_min));
-			y = height - ((scale * my) + abs(scale * glyph->y_min));
-			TTFVector tmp_point1 = { x, y, 0x01 };
-			logd("[ttf -> index %i] x %i, y %i\n", points.size, x, y);
+		x0 = width - ((scale * glyph->pts_x[i]) + abs(scale * glyph->x_min));
+		y0 = height - ((scale * glyph->pts_y[i]) + abs(scale * glyph->y_min));
+		if (y0 < min_y) { min_y = y0; }
+		if (max_y < y0) { max_y = y0; }
+		vec2f tmp_point0 = { x0, y0 };
+		if (glyph->flags[i] &0x01) { arr_add(&points, &tmp_point0); }
+		else if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
+			mx = (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
+			my = (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
+			x0 = width - ((scale * mx) + abs(scale * glyph->x_min));
+			y0 = height - ((scale * my) + abs(scale * glyph->y_min));
+			vec2f tmp_point1 = { x0, y0 };
 			arr_add(&points, &tmp_point1);
 		}
-		for (u32 j = jj; j < glyph->num_contours; j++) {
-			if (glyph->end_pts_of_contours[j] == i) { arr_add(&contours, &points.size); j++; }
+
+		if (glyph->end_pts_of_contours[contour_counter] == i) {
+			contour_counter++;
+			for (u32 j = 0; j < points.size; j++) {
+				vec2f* point0 = (vec2f*) arr_get(&points, j);
+				vec2f* point1 = (vec2f*) arr_get(&points, j + 1);
+				line2f line = { *point0, *point1 };
+				arr_add(&lines, &line);
+			}
+			arr_clean(&points);
 		}
 	}
+	arr_free(&points);
 
-	s32 dx, dy;
-	u32 intersection, x0, x1, smaller_y, bigger_y, i0, i1;
-	// TODO: change intersections into floats
+	s32 dx, dy, intersection, smaller_y, bigger_y, m0, m1;
 	Array intersections;
-	arr_init(&intersections, sizeof(u32));
-	for (u32 i = 0; i < height; i++) {
-		for (u32 l = 0; l < contours.size - 1; l++) {
-			i0 = *((u32*) arr_get(&contours, l));
-			i1 = *((u32*) arr_get(&contours, l + 1));
-			for (u32 j = i0; j < i1; j++) {
-				// NOTE: this is line equation, point-slope format
-				TTFVector* vec0 = (TTFVector*) arr_get(&points, j);
-				jj = j + 1;
-				if (i1 <= jj) { jj %= i1; jj += i0; }
-				TTFVector* vec1 = (TTFVector*) arr_get(&points, jj);
+	arr_init(&intersections, sizeof(s32));
+	for (u32 i = min_y; i < max_y; i++) {
+		for (u32 j = 0; j < lines.size; j++) {
+			line2f* line = (line2f*) arr_get(&lines, j);
+			
+			smaller_y = MIN(line->p0.y, line->p1.y);
+			bigger_y = MAX(line->p0.y, line->p1.y);
+			if (i <= smaller_y) continue;
+			if (i > bigger_y) continue;
 
-				smaller_y = MIN(vec0->y, vec1->y);
-				bigger_y = MAX(vec0->y, vec1->y);
-				if (i <= smaller_y) continue;
-				if (i > bigger_y) continue;
+			dx = line->p1.x - line->p0.x;
+			dy = line->p1.y - line->p0.y;
+			if (dy == 0) continue;
 
-				dx = (s32) vec1->x - vec0->x;
-				dy = (s32) vec1->y - vec0->y;
-				if (dy == 0) continue;
-
-				if (dx == 0) {
-					intersection = vec0->x;
-				} else {
-					intersection = ((s32) i - vec0->y) * (dx / dy) + vec0->x;
-				}
-				logd("[ttf - scanline %i, line %i] intersection done\n", i, j);
-				arr_add(&intersections, &intersection);
-			}
+			if (dx == 0) { intersection = line->p0.x; }
+			else { intersection = (i - line->p0.y) * (dx / dy) + line->p0.x; }
+			arr_add(&intersections, &intersection);
 		}
 
-		// TODO: implement qsort version
-		bubble_sortui(intersections.data, intersections.size);
-		logd("[ttf - scanline %i] intersections.size %i\n", i, intersections.size);
-		
+		qsort(intersections.data, intersections.size, sizeof(s32), cmp_floats_callback);
 		for (u32 k = 0; k < intersections.size; k += 2) {
-			x0 = *((u32*) arr_get(&intersections, k));
-			x1 = *((u32*) arr_get(&intersections, k + 1));
-			for (u32 m = x0; m < x1; m++) {
+			m0 = *((s32*) arr_get(&intersections, k));
+			m1 = *((s32*) arr_get(&intersections, k + 1));
+			for (u32 m = m0; m < m1; m++) {
 				bmp[m + i * width] = (pixel) { 0xff, 0xff, 0xff, 0xff };
 			}
 		}
 		arr_clean(&intersections);
 	}
 	arr_free(&intersections);
-	arr_free(&points);
-	arr_free(&contours);
+	arr_free(&lines);
+	
 	return bmp;
 }
 

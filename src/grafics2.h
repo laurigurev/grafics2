@@ -49,6 +49,12 @@ typedef struct vec2f_t
 	s32 y;
 } vec2f;
 
+typedef struct line2f_t
+{
+	vec2f p0;
+	vec2f p1;
+} line2f;
+
 // ---------------------------------------------------------------------------------
 /*
   		sort.c
@@ -59,7 +65,9 @@ typedef struct vec2f_t
 void bubble_sorts(short* arr, uint64_t size);
 // bubble sort for 'unsigned int'-type, aka. uint32_t
 void bubble_sortui(uint32_t* arr, uint64_t size);
+void bubble_sortf(s32* arr, uint64_t size);
 // TODO: add faster and better sort algorithms
+i32 cmp_floats_callback(const void* f0, const void* f1);
 
 // ---------------------------------------------------------------------------------
 /*

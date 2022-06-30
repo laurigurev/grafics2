@@ -20,7 +20,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	
 	u32 width = 128;
 	u32 height = width;
-	void* pixels = (void*) ttf_create_bitmap(ttf, 'A', width, height);
+	void* pixels = (void*) ttf_create_bitmap(ttf, 'a', width, height);
 	ttf_free2(&ttf);
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
