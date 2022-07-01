@@ -22,13 +22,14 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	u32 height = width;
 	void* pixels = (void*) ttf_create_bitmap(ttf, 'a', width, height);
 	ttf_free(&ttf);
+	VkFormat format = VK_FORMAT_R8_SRGB;
 
 	VkImageCreateInfo image_info = (VkImageCreateInfo) {
    		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.pNext = NULL,
 		.flags = 0,
 		.imageType = VK_IMAGE_TYPE_2D,
-		.format = VK_FORMAT_R8G8B8A8_SRGB,
+		.format = format,
 		.extent = { width, height, 1 },
 		.mipLevels = 1,
 		.arrayLayers = 1,
@@ -51,18 +52,18 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	result = vkmaCreateImage(mAllocator, &image_info, &texture->image,
 							 &allocInfo, &texture->allocation);
 	assert(result == VK_SUCCESS);
-	
-	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
+
+	vktransitionimglayout(&texture->image, bp, core, format,
 						  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	VkbaVirtualBuffer stagingBuffer;
-	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height * 4, pixels, 0 };
+	VkbaVirtualBufferInfo tmpBufferInfo = { HOST_INDEX, width * height, pixels, 0 };
 	result = vkbaCreateVirtualBuffer(bAllocator, &stagingBuffer, &tmpBufferInfo);
 	memcpy(stagingBuffer.dst, stagingBuffer.src, stagingBuffer.locale.size);
 	
 	vkcopybuftoimg(texture, bp, core, &stagingBuffer, width, height);
-	
-	vktransitionimglayout(&texture->image, bp, core, VK_FORMAT_R8G8B8A8_SRGB,
+
+	vktransitionimglayout(&texture->image, bp, core, format,
 						  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -72,7 +73,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.flags = 0,
 		.image = texture->image,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format = VK_FORMAT_R8G8B8A8_SRGB,
+		.format = format,
 		.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
 						VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
 		.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
@@ -90,8 +91,6 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.pNext = NULL,
 		.flags = 0,
-		// .magFilter = VK_FILTER_LINEAR,
-		// .minFilter = VK_FILTER_LINEAR,
 		.magFilter = VK_FILTER_NEAREST,
 		.minFilter = VK_FILTER_NEAREST,
 		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,

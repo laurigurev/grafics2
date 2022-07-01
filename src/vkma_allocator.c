@@ -233,6 +233,22 @@ VkResult vkmaCreateImage(VkmaAllocator* allocator,
 	assert(allocation != NULL);
 
 	VkResult result;
+	u64 depth;
+
+	switch (imageInfo->format) {
+	case VK_FORMAT_R8_SRGB:
+		depth = 1;
+		vkma_logi("[vkma] format 'VK_FORMAT_R8_SRGB' chosen for image '%s'\n",
+				  allocInfo->name);
+		break;
+	case VK_FORMAT_R8G8B8A8_SRGB:
+		depth = 4;
+		vkma_logi("[vkma] format 'VK_FORMAT_R8G8B8A8_SRGB' chosen for image '%s'\n",
+				  allocInfo->name);
+		break;
+	default:
+		vkma_loge("[vkma] format for image '%s' unsupported\n", allocInfo->name);
+	}
 	
 	if (!(allocInfo->create & VKMA_ALLOCATION_CREATE_DONT_CREATE)) {
 		result = vkCreateImage(allocator->device, imageInfo, NULL, image);
@@ -297,7 +313,7 @@ VkResult vkmaCreateImage(VkmaAllocator* allocator,
 	}
 
 	// bind buffer
-	u32 imageSize = imageInfo->extent.width * imageInfo->extent.height * 4;
+	u32 imageSize = imageInfo->extent.width * imageInfo->extent.height * depth;
 	VkmaHeap* heap = allocator->heaps + heapIndex;
 	for (u32 i = 0; i < heap->blocks.size; i++) {
 		VkmaBlock* block = arr_get(&heap->blocks, i);

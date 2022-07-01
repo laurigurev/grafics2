@@ -1,6 +1,4 @@
-
 #include "grafics2.h"
-
 
 #define ENDIAN_WORD(a) ((((0xFF00 & a) >> 8) | ((0x00FF & a) << 8)))
 #define ENDIAN_DWORD(a) \
@@ -255,7 +253,6 @@ int ttf_load(TrueTypeFont** true_type_font, const char* font_path)
 		// loca
 		u64 loca_offset = tables[3].offset;
 		ttf->loca = ((void*) ttf) + alloc_tail_offset;
-		// memcpy(ttf->loca, buffer + loca_offset, ttf->num_glyphs * U32_SIZE);
 		alloc_tail_offset += ttf->num_glyphs * U32_SIZE;
 
 		if (index_to_loc_format) {
@@ -265,8 +262,10 @@ int ttf_load(TrueTypeFont** true_type_font, const char* font_path)
 			}
 		} else {
 			for (u16 i = 0; i < ttf->num_glyphs; i++) {
-				u32 location = (u32) *(buffer + loca_offset + i * U16_SIZE);
-				ttf->loca[i] = ENDIAN_DWORD(location);
+				u16 tmp_location = *((u16*) (buffer + loca_offset + i * U16_SIZE));
+				tmp_location = ENDIAN_WORD(tmp_location);
+				ttf->loca[i] = (u32) tmp_location;
+				ttf->loca[i] = ttf->loca[i] << 1;
 			}
 		}
 		
@@ -671,8 +670,8 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	assert(ttf != NULL);
 	assert(width != 0 && height != 0);
 	
-	pixel* bmp = (pixel*) malloc(width * height * sizeof(pixel));
-	memset(bmp, 0, width * height * sizeof(pixel));
+	char* bmp = (char*) malloc(width * height);
+	memset(bmp, 0, width * height);
 
 	i32 glyph_index = ttf_glyph_index_get(ttf, c);
 	TrueTypeFontGlyph* glyph = ttf->glyphs + glyph_index;
@@ -750,7 +749,7 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 			m0 = *((s32*) arr_get(&intersections, k));
 			m1 = *((s32*) arr_get(&intersections, k + 1));
 			for (u32 m = m0; m < m1; m++) {
-				bmp[m + i * width] = (pixel) { 0xff, 0xff, 0xff, 0xff };
+				bmp[m + i * width] = 0xff;
 			}
 		}
 		arr_clean(&intersections);

@@ -8,5 +8,5 @@ layout(location = 0) out vec4 out_color;
 
 void main() {
 	// out_color = vec4(in_color * 0.5 + texture(img, in_uv).rgb, 1.0);
-	out_color = texture(img, in_uv);
+	out_color = vec4(vec3(texture(img, in_uv).r), 1.0);
 }
