@@ -148,7 +148,7 @@ void file_free(void* buffer);
 
 char* bmp_load(const char* file, uint32_t* width, uint32_t* height);
 void bmp_free(char* buffer);
-// void bmp_save();
+void bmp_save(const char* file, char* bmp, u32 width, u32 height, i32 bytes_per_pixel);
 
 // ---------------------------------------------------------------------------------
 /*
@@ -217,6 +217,8 @@ void ttf_glyph_get_hmtc(TrueTypeFont* ttf, TrueTypeFontGlyph* glyph, u32 glyph_i
 void ttf_glyph_create_deep_copy(TrueTypeFont* ttf, u32 src_index, TrueTypeFontGlyph** dst);
 i32 ttf_glyph_index_get(TrueTypeFont* ttf, u16 code_point);
 void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height);
+// TODO: user needs character specific info like aw and lsb, also bitmap width and height
+void* ttf_create_font_atlas(TrueTypeFont* ttf, const char* characters, u32 point_size);
 
 // ---------------------------------------------------------------------------------
 /*

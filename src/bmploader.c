@@ -187,3 +187,70 @@ void bmp_free(char* bmp_buffer)
 		free(bmp_buffer);
 	}
 }
+
+void bmp_save(const char* file, char* bmp, u32 width, u32 height, i32 bytes_per_pixel)
+{
+	u32 padding = width % 4;
+	u32 file_size = width * height * 3 + 14 + 40 + height * padding;
+	char* buffer = (char*) malloc(file_size);
+
+	switch (bytes_per_pixel) {
+		case 1:
+		{
+			strcpy(buffer, "BM");
+			memcpy(buffer + 2, &file_size, sizeof(u32));
+			memset(buffer + 6, 0, sizeof(u32));
+			u32 data_offset = 14 + 40;
+			memcpy(buffer + 10, &data_offset, sizeof(u32));
+
+			bmp_info_header bmp_header = {
+				40, width, height, 1, 24, 0, 0, 2835, 2835, 0, 0
+			};
+			// TODO: get proper resolution values
+			
+			memcpy(buffer + 14, &bmp_header.size, sizeof(u32));
+			memcpy(buffer + 18, &bmp_header.width, sizeof(u32));
+			memcpy(buffer + 22, &bmp_header.height, sizeof(u32));
+			
+			memcpy(buffer + 26, &bmp_header.planes, sizeof(i16));
+			memcpy(buffer + 28, &bmp_header.bits_per_pixel, sizeof(i16));
+
+			memcpy(buffer + 30, &bmp_header.compression, sizeof(u32));
+			memcpy(buffer + 34, &bmp_header.image_size, sizeof(u32));
+			memcpy(buffer + 38, &bmp_header.xpixel_per_m, sizeof(u32));
+			memcpy(buffer + 42, &bmp_header.ypixel_per_m, sizeof(u32));
+			memcpy(buffer + 46, &bmp_header.colors_used, sizeof(u32));
+			memcpy(buffer + 50, &bmp_header.important_colors, sizeof(u32));
+
+			char* data = buffer + 54;
+			char* p_bmp = bmp + width * height;
+			p_bmp--;
+			
+			for (u32 i = 0; i < height; i++) {
+				for (u32 j = 0; j < width; j++) {
+					*data = *p_bmp;
+					data++;
+					*data = *p_bmp;
+					data++;
+					*data = *p_bmp;
+					data++;
+					p_bmp--;
+				}
+				data += padding;
+			}
+
+			FILE* f;
+			f = fopen(file, "wb");
+			fwrite(buffer, sizeof(char), file_size, f);
+			fclose(f);
+		
+			break;
+		}
+		default:
+		{
+			// UNSOPPORTED
+			return;
+		}
+	}
+	free(buffer);
+}

@@ -760,6 +760,116 @@ void* ttf_create_bitmap(TrueTypeFont* ttf, char c, u32 width, u32 height)
 	return bmp;
 }
 
+void* ttf_create_font_atlas(TrueTypeFont* ttf, const char* characters, u32 point_size)
+{
+	/*
+	  	USAGE:
+
+		// TODO
+		
+	 */
+	
+	u32 width = 0;
+	u32 height = point_size;
+
+	s32 scale = (s32) point_size / (s32) ttf->units_per_em;
+	s32 descent = scale * ttf->descent;
+	s32 x0, y0, mx, my;
+	u32 min_y = height;
+	u32 max_y = 0;
+	u32 contour_counter;
+	u32 total_aw = 0;
+
+	Array lines, points, p_glyphs;
+	arr_init(&lines, sizeof(line2f));
+	arr_init(&points, sizeof(vec2f));
+	arr_init(&p_glyphs, sizeof(TrueTypeFontGlyph*));
+	
+	for (u32 i = 0; i < strlen(characters); i++) {
+		TrueTypeFontGlyph* glyph = ttf->glyphs + ttf_glyph_index_get(ttf, characters[i]);
+		arr_add(&p_glyphs, &glyph);
+		width += glyph->aw;
+	}
+	width = width * scale;
+
+	for (u32 i = 0; i < p_glyphs.size; i++) {
+		contour_counter = 0;
+		TrueTypeFontGlyph* glyph = *((TrueTypeFontGlyph**) arr_get(&p_glyphs, i));
+
+		for (u16 i = 0; i < glyph->num_points; i++) {
+			x0 = (width - total_aw) - (scale * glyph->pts_x[i]) + (scale * glyph->x_min);
+			y0 = height - (scale * glyph->pts_y[i]) + descent;
+			if (y0 < min_y) min_y = y0;
+			if (max_y < y0) max_y = y0;
+			vec2f tmp_point0 = { x0, y0 };
+			if (glyph->flags[i] &0x01) { arr_add(&points, &tmp_point0); }
+			else if (!(glyph->flags[i] & 0x01) && !(glyph->flags[i + 1] & 0x01)) {
+				mx = (glyph->pts_x[i] + glyph->pts_x[i + 1]) / 2;
+				my = (glyph->pts_y[i] + glyph->pts_y[i + 1]) / 2;
+				x0 = (width - total_aw) - (scale * mx) + (scale * glyph->x_min);
+				y0 = height - (scale * my) + descent;
+				vec2f tmp_point1 = { x0, y0 };
+				arr_add(&points, &tmp_point1);
+			}
+
+			if (glyph->end_pts_of_contours[contour_counter] == i) {
+				contour_counter++;
+				for (u32 j = 0; j < points.size; j++) {
+					vec2f* point0 = (vec2f*) arr_get(&points, j);
+					vec2f* point1 = (vec2f*) arr_get(&points, j + 1);
+					line2f line = { *point0, *point1 };
+					arr_add(&lines, &line);
+				}
+				arr_clean(&points);
+			}
+		}
+		arr_clean(&points);
+		total_aw += scale * glyph->aw;
+	}
+	arr_free(&p_glyphs);
+	arr_free(&points);
+
+	// width = width * scale;
+	char* bmp = (char*) malloc(width * height);
+
+	s32 dx, dy, intersection, smaller_y, bigger_y, m0, m1;
+	Array intersections;
+	arr_init(&intersections, sizeof(s32));
+	for (u32 i = min_y; i < max_y; i++) {
+		for (u32 j = 0; j < lines.size; j++) {
+			line2f* line = (line2f*) arr_get(&lines, j);
+			
+			smaller_y = MIN(line->p0.y, line->p1.y);
+			bigger_y = MAX(line->p0.y, line->p1.y);
+			if (i <= smaller_y) continue;
+			if (i > bigger_y) continue;
+
+			dx = line->p1.x - line->p0.x;
+			dy = line->p1.y - line->p0.y;
+			if (dy == 0) continue;
+
+			if (dx == 0) { intersection = line->p0.x; }
+			else { intersection = (i - line->p0.y) * (dx / dy) + line->p0.x; }
+			arr_add(&intersections, &intersection);
+		}
+
+		qsort(intersections.data, intersections.size, sizeof(s32), cmp_floats_callback);
+		for (u32 k = 0; k < intersections.size; k += 2) {
+			m0 = *((s32*) arr_get(&intersections, k));
+			m1 = *((s32*) arr_get(&intersections, k + 1));
+			for (u32 m = m0; m < m1; m++) {
+				bmp[m + i * width] = 0xff;
+			}
+		}
+		arr_clean(&intersections);
+	}
+	arr_free(&intersections);
+	arr_free(&lines);
+
+	// bmp_save("resources/atlas.bmp", bmp, width, height, 1);
+	return bmp;
+}
+
 s32 f2fot14_to_float_2(u16 f2dot14) {
 	i8 tmp1 = (0xc000 & f2dot14) >> 14;
 	if (tmp1 == 2) {

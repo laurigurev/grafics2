@@ -13,7 +13,7 @@ void vktexturec(VkTexture* texture, VkBoilerplate* bp, VkCore* core,
 	uint32_t width, height;
 	void* pixels = (void*) bmp_load("resources/test2.bmp", &width, &height);
 	*/
-	
+
 	TrueTypeFont* ttf = NULL;
 	i32 ttf_result = ttf_load(&ttf, "resources/calibri.ttf");
 	assert(ttf_result == 1);
