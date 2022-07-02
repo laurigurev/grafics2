@@ -44,9 +44,6 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 
 	// -------------------------------------------------------------------
 	
-	// char* vertex_shader = file_read("spv/default.vert.spv", &vertsize);
-	// char* fragment_shader = file_read("spv/default.frag.spv", &fragsize);
-	
 	Vertex vertices[4] = {
 		{ { -0.5f, -0.5f }, { 1.0f, 0.0f } },
 		{ {  0.5f, -0.5f }, { 0.0f, 0.0f } },
@@ -60,13 +57,30 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 	tmpBufferInfo = (VkbaVirtualBufferInfo) { DEVICE_INDEX, sizeof(u32) * 6, indices };
 	vkbaStageVirtualBuffer(bAllocator, &doodad->indexbuff, &tmpBufferInfo);
 
-	VkVertexInputBindingDescription vibd = (VkVertexInputBindingDescription) {
-		.binding = 0,
-		.stride = sizeof(Vertex),
-		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+	vec2f instance_data[] = {
+		(vec2f) { 0.0f, 0.0f },
+		(vec2f) { 1.0f, 0.0f },
+		(vec2f) { 0.0f, 1.0f }
+	};
+	tmpBufferInfo = (VkbaVirtualBufferInfo) {
+		DEVICE_INDEX, sizeof(vec2f) * 3, instance_data
+	};
+	vkbaStageVirtualBuffer(bAllocator, &doodad->instbuff, &tmpBufferInfo);
+
+	VkVertexInputBindingDescription vibd[] = {
+		(VkVertexInputBindingDescription) {
+			.binding = 0,
+			.stride = sizeof(Vertex),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+		},
+		(VkVertexInputBindingDescription) {
+			.binding = 1,
+			.stride = sizeof(vec2f),
+			.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE
+		}
 	};
 
-	VkVertexInputAttributeDescription viad[2] = {
+	VkVertexInputAttributeDescription viad[] = {
 		(VkVertexInputAttributeDescription) {
 			.binding = 0,
 			.location = 0,
@@ -78,11 +92,17 @@ void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllo
 			.location = 1,
 			.format = VK_FORMAT_R32G32_SFLOAT,
 			.offset = 2*4
+		},
+		(VkVertexInputAttributeDescription) {
+			.binding = 1,
+			.location = 2,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = 0
 		}
 	};
 
 	VkenPipelineCreateInfo pInfo = {
-		"spv/default.vert.spv", "spv/default.frag.spv", 1, &vibd, 2, viad,
+		"spv/default.vert.spv", "spv/default.frag.spv", 2, vibd, 3, viad,
 		1, &doodad->dlayout, core->swpcext, bp->dev, core->renderpass, 0
 	};
 	vkenCreatePipelines(1, &doodad->pipeline, &pInfo);
@@ -97,6 +117,7 @@ void vkdoodadd(VkDoodad* doodad, VkbaAllocator* bAllocator,
 
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->vertexbuff);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->indexbuff);
+	vkbaDestroyVirtualBuffer(bAllocator, &doodad->instbuff);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->ubos[0]);
 	vkbaDestroyVirtualBuffer(bAllocator, &doodad->ubos[1]);
 

@@ -148,6 +148,7 @@ void file_free(void* buffer);
 
 char* bmp_load(const char* file, uint32_t* width, uint32_t* height);
 void bmp_free(char* buffer);
+// void bmp_save();
 
 // ---------------------------------------------------------------------------------
 /*
@@ -207,13 +208,6 @@ typedef struct TrueTypeFont_t
 	u32* loca;
 	TrueTypeFontGlyph* glyphs;
 } TrueTypeFont;
-
-typedef struct TTFVector_t
-{
-	u32 x;
-	u32 y;
-	u8 flag;
-} TTFVector;
 
 int ttf_load(TrueTypeFont** true_type_font, const char* font_path);
 void ttf_free(TrueTypeFont** true_type_font);
@@ -601,7 +595,8 @@ typedef enum VkbpInstruction_t
 	VKBP_INSTRUCTION_BIND_DESCRIPTOR_SETS = 0x00000008,
 	VKBP_INSTRUCTION_DRAW_INDEXED = 0x00000010,
 	VKBP_INSTRUCTION_START_PIPELINE = 0x00000020,
-	VKBP_INSTRUCTION_END_PIPELINE = 0x00000040
+	VKBP_INSTRUCTION_END_PIPELINE = 0x00000040,
+	VKBP_INSTRUCTION_BIND_INSTANCE_BUFFER = 0x00000080
 } VkbpInstruction;
 typedef u32 VkbpInstructionFlag;
 
@@ -617,11 +612,13 @@ typedef struct VkbpBindingPipelineInfo_t
 	VkPipeline pipeline;
 	VkbaVirtualBuffer* vertexBuffer;
 	VkbaVirtualBuffer* indexBuffer;
+	VkbaVirtualBuffer* instanceBuffer;
 	VkPipelineLayout pipelineLayout;
 	u32 maxFramesInFlight;
 	u32 descriptorSetCount;
 	VkDescriptorSet* descriptorSets;
 	u32 indexCount;
+	u32 instanceCount;
 } VkbpBindingPipelineInfo;
 
 VkResult vkbpCreateMachine(VkbpMachine* machine, u64 size);
@@ -685,6 +682,7 @@ typedef struct
 	VkenPipeline pipeline;
 	VkbaVirtualBuffer vertexbuff;
 	VkbaVirtualBuffer indexbuff;
+	VkbaVirtualBuffer instbuff;
 	
 	VkTexture texture;
 	float uboData[3];
@@ -692,8 +690,6 @@ typedef struct
 
 	VkDescriptorSetLayout dlayout;
 	VkDescriptorSet dsets[MAX_FRAMES_IN_FLIGHT];
-
-	// u64 bindingId;		// NOTE: this has to be here, otherwise app crashes
 } VkDoodad;
 
 void vkdoodadc(VkDoodad* doodad, VkbaAllocator* bAllocator, VkmaAllocator* mAllocator, 
